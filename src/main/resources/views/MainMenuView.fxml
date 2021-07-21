@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.Font?>
+
+<!--
+maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity"
+-->
+
+<BorderPane fx:id="bpMainWindow" stylesheets="@../styles/mainMenuStyle.css" xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="main.hr.kcosic.project.controllers.MainMenuController">
+   <center>
+      <VBox alignment="CENTER" prefHeight="400.0" prefWidth="300.0" BorderPane.alignment="CENTER">
+         <Button fx:id="btnNewGame" mnemonicParsing="false" onAction="#newGame" text="New game">
+            <VBox.margin>
+               <Insets bottom="30.0" top="30.0"/>
+            </VBox.margin>
+         </Button>
+         <Button fx:id="btnOptions" mnemonicParsing="false" onAction="#options" text="Options">
+            <VBox.margin>
+               <Insets bottom="30.0" top="30.0"/>
+            </VBox.margin>
+         </Button>
+         <Button fx:id="btnExit" mnemonicParsing="false" onAction="#exit" text="Exit">
+            <VBox.margin>
+               <Insets bottom="30.0" top="30.0"/>
+            </VBox.margin>
+         </Button>
+      </VBox>
+   </center>
+   <bottom>
+      <Label alignment="CENTER_RIGHT" text="by Krešimir Ćosić" BorderPane.alignment="CENTER_RIGHT">
+         <padding>
+            <Insets bottom="20.0" />
+         </padding>
+      </Label>
+   </bottom>
+   <top>
+      <Label text="Snakes and ladders" BorderPane.alignment="CENTER">
+         <font>
+            <Font size="30.0" />
+         </font>
+         <BorderPane.margin>
+            <Insets top="100.0" />
+         </BorderPane.margin>
+      </Label>
+   </top>
+</BorderPane>

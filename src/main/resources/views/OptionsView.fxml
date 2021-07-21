@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.Font?>
+
+<BorderPane prefWidth="500.0" stylesheets="@../styles/optionsStyle.css" xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="main.hr.kcosic.project.controllers.OptionsController">
+   <bottom>
+      <HBox alignment="CENTER" prefHeight="100.0" prefWidth="200.0" BorderPane.alignment="CENTER">
+         <Button fx:id="btnSave" mnemonicParsing="false" onAction="#save" text="Save">
+            <HBox.margin>
+               <Insets left="30.0" right="30.0"/>
+            </HBox.margin>
+         </Button>
+         <Button fx:id="btnCancel" mnemonicParsing="false" onAction="#cancel" text="Cancel">
+            <HBox.margin>
+               <Insets left="30.0" right="30.0"/>
+            </HBox.margin>
+         </Button>
+      </HBox>
+   </bottom>
+   <center>
+      <HBox alignment="CENTER" prefHeight="100.0" prefWidth="200.0" BorderPane.alignment="CENTER">
+         <VBox alignment="CENTER_RIGHT" prefHeight="200.0" prefWidth="300.0">
+            <Label text="Resolution">
+               <VBox.margin>
+                  <Insets bottom="30.0" left="30.0" right="30.0" top="30.0"/>
+               </VBox.margin>
+            </Label>
+            <Label text="Fullscreen">
+               <VBox.margin>
+                  <Insets bottom="30.0" left="30.0" right="30.0" top="30.0"/>
+               </VBox.margin>
+            </Label>
+         </VBox>
+         <VBox alignment="CENTER_LEFT" prefHeight="200.0" prefWidth="300.0">
+            <ComboBox fx:id="cbResolution" onAction="#changeResolution" prefHeight="25.0" prefWidth="206.0">
+               <VBox.margin>
+                  <Insets bottom="30.0" left="30.0" right="30.0" top="30.0"/>
+               </VBox.margin>
+            </ComboBox>
+            <CheckBox fx:id="chkFullscreen" mnemonicParsing="false" onAction="#toggleFullscreen">
+               <VBox.margin>
+                  <Insets bottom="30.0" left="30.0" right="30.0" top="30.0"/>
+               </VBox.margin>
+            </CheckBox>
+         </VBox>
+      </HBox>
+   </center>
+   <top>
+      <Label text="OPTIONS" BorderPane.alignment="CENTER">
+         <font>
+            <Font size="41.0" />
+         </font>
+      </Label>
+   </top>
+</BorderPane>

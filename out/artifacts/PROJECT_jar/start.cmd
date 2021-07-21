@@ -1,0 +1,1 @@
+java --module-path D:/JDK/javafx-sdk-15/lib --add-modules javafx.controls,javafx.fxml -jar PROJECT.jar
