@@ -29,8 +29,11 @@ public class MainMenuController extends MyController implements Initializable {
 
     }
 
+    /**
+     * Starts a new game view
+     */
     @FXML
-    public void newGame(ActionEvent actionEvent) {
+    public void newGame() {
         try {
 
 
@@ -41,13 +44,20 @@ public class MainMenuController extends MyController implements Initializable {
         }
     }
 
+    /**
+     * Exits the program.
+     * @param actionEvent Event that happened to trigger this method. Used as a reference point for closing the stage
+     */
     @FXML
     public void exit(ActionEvent actionEvent) {
         SceneUtils.closeStage((Node)actionEvent.getSource());
     }
 
+    /**
+     * Redirects user to Options window
+     */
     @FXML
-    public void options(ActionEvent actionEvent) {
+    public void options() {
         try {
             SceneUtils.createAndReplaceStage(ViewEnum.OPTIONS_VIEW, "Options", settings);
         } catch (Exception e) {

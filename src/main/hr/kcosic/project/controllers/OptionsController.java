@@ -16,6 +16,9 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.*;
 
+/**
+ * Controller for Options view.
+ */
 public class OptionsController extends MyController implements Initializable {
 
     @FXML

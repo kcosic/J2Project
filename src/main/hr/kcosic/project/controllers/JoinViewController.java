@@ -38,6 +38,10 @@ public class JoinViewController extends MyController implements Initializable {
         SceneUtils.createAndReplaceStage(ViewEnum.NETWORK_GAME_OPTIONS, "Network game", settings);
     }
 
+    /**
+     * Connects to the server and awaits further instructions.
+     * @throws IOException Throws IOException if Board scene was not created
+     */
     @FXML
     public void connect() throws IOException {
         NetworkUtils.connectToServer(tfAddress.getText().trim(), GameServer.PORT_NUM);
@@ -76,6 +80,9 @@ public class JoinViewController extends MyController implements Initializable {
         newThread.start();
     }
 
+    /**
+     * Checks to see if input is valid. If is then button will be enabled.
+     */
     @FXML
     public void checkValidity() {
         btnConnect.setDisable(tfAddress.getText().trim().isEmpty() || tfName.getText().trim().isEmpty());

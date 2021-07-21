@@ -19,7 +19,7 @@ public class SceneUtils {
      * @param stageTitle Title of Stage.
      * @param settings Game settings.
      * @return Loaded stage object.
-     * @throws IOException
+     * @throws IOException If view is invalid and scene was not created, IOException is thrown.
      */
     public static Stage createStage(String view, String stageTitle, Properties settings) throws IOException {
         String resolution = null;
@@ -46,8 +46,6 @@ public class SceneUtils {
 
     /**
      * Creates Stage object for given view with given title.
-     * @return Loaded stage object.
-     * @throws IOException
      */
     public static void replaceStage( Stage newStage) {
         stage = newStage;
