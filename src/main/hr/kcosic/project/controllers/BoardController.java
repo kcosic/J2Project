@@ -86,11 +86,22 @@ public class BoardController extends MyController implements Initializable {
             initializeComponents();
             initializeListeners();
             areSettingsEmpty();
-            createBoard();
             if(isHotseatOrHost()){
+                createBoard();
                 addSnakesAndLadders();
+
+                if(getIsOverNetworkSetting() && getIsCurrentPlayerHostSetting()){
+                    NetworkUtils.sendData(new DataWrapper(
+                            DataType.BOARD,
+                            new Board(
+                                    tiles,
+                                    null
+                            )
+                    ));
+                }
+                redraw();
+
             }
-            redraw();
         } catch (SettingsException | IOException e) {
             e.printStackTrace();
         }
@@ -125,20 +136,22 @@ public class BoardController extends MyController implements Initializable {
                 var exit = false;
                 while(!exit) {
                     try {
-                        var data = (DataWrapper)(new ObjectInputStream(clientSocket.getInputStream())).readObject();
-                        switch (data.getType()){
-                            case MESSAGE -> Platform.runLater(()->crunchMessage((String)data.getData()));
-                            case GAME_STATE -> Platform.runLater(()->crunchNewGameState((GameState)data.getData()));
-                            case BOARD -> Platform.runLater(()-> copyBoard((Board)data.getData()));
-                            default -> throw new InvalidObjectException("Wrong data");
+                        if(readThread.isInterrupted()){
+                            exit = true;
                         }
-
-
-
+                        else {
+                            LogUtils.logInfo("Waiting for game information");
+                            var data = (DataWrapper)(new ObjectInputStream(clientSocket.getInputStream())).readObject();
+                            switch (data.getType()){
+                                case MESSAGE -> Platform.runLater(()->crunchMessage((String)data.getData()));
+                                case GAME_STATE -> Platform.runLater(()->crunchNewGameState((GameState)data.getData()));
+                                case BOARD -> Platform.runLater(()-> copyBoard((Board)data.getData()));
+                                default -> throw new InvalidObjectException("Wrong data");
+                            }
+                        }
                     } catch (IOException | ClassNotFoundException e) {
                         e.printStackTrace();
                     }
-
                 }
             });
             readThread.start();
@@ -146,9 +159,13 @@ public class BoardController extends MyController implements Initializable {
     }
 
     private void copyBoard(Board data) {
-        gpBoard = data.getGpBoard();
+        LogUtils.logWarning("Copying board");
         tiles = data.getTiles();
+        generateBoardFromTiles(tiles);
+        redraw();
+
     }
+
 
     private void crunchNewGameState(GameState data) {
         LogUtils.logInfo(new Gson().toJson(data));
@@ -161,23 +178,19 @@ public class BoardController extends MyController implements Initializable {
     private void initializeComponents() {
         lvChatLog.itemsProperty().bind(listProperty);
         listProperty.set(chat);
-        lvChatLog.setCellFactory(list -> {
-            ListCell cell = new ListCell() {
-                @Override
-                public void updateItem(Object item, boolean empty) {
-                    super.updateItem(item, empty);
-                    if (empty || item == null) {
-                        setText(null);
-                    } else {
-                        setWrapText(true);
-                        setPrefWidth(10);
-                        setText(item.toString());
-                    }
+        lvChatLog.setCellFactory(list -> new ListCell<>() {
+            @Override
+            public void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                } else {
+                    setWrapText(true);
+                    setPrefWidth(10);
+                    setText(item);
                 }
+            }
 
-            };
-
-            return cell;
         });
         clearTextField();
 
@@ -368,6 +381,7 @@ public class BoardController extends MyController implements Initializable {
 
         if (getIsOverNetworkSetting()) {
             //network logic
+            throw new RuntimeException("Not implemented");
 
         } else {
             //hot seat logic
@@ -520,12 +534,16 @@ public class BoardController extends MyController implements Initializable {
 
     }
 
+
+
+
+
     /**
      * Generates initial board state with initial player positions.
      *
      * @throws SettingsException is thrown when any of the crucial settings are missing.
      */
-    private void createBoard() throws SettingsException, IOException {
+    private void createBoard() throws SettingsException {
 
             if (!settings.containsKey(SettingsEnum.NUMBER_OF_TILES)) {
                 throw new SettingsException("Number of tiles parameter is missing.");
@@ -638,7 +656,8 @@ public class BoardController extends MyController implements Initializable {
                         }
                     }
 
-                } else {
+                }
+                else {
                     tileGridPane.add(new VBox(), 0, 1);
                     tileGridPane.add(new VBox(), 2, 1);
                     tileGridPane.add(new VBox(), 1, 0);
@@ -659,11 +678,11 @@ public class BoardController extends MyController implements Initializable {
                 tile.setRowIndex(row);
                 tile.setColumnIndex(column);
 
-                tileGridPane = addBackground(tileGridPane, boardBackgroundColor);
-                tileGridPane = calculateBorders(tileGridPane, column, row, tile.getId(), numberOfTiles);
+                var copyGridPane = addBackground(tileGridPane, boardBackgroundColor);
+                copyGridPane = calculateBorders(copyGridPane, column, row, tile.getId(), numberOfTiles);
 
                 tiles.add(tile);
-                gpBoard.add(tileGridPane, column, row);
+                gpBoard.add(copyGridPane, column, row);
             }
 
             for (int i = 0; i < numberOfTiles / 10; i++) {
@@ -679,20 +698,182 @@ public class BoardController extends MyController implements Initializable {
                 cc.setPercentWidth(100);
                 gpBoard.getColumnConstraints().add(cc);
             }
+    }
 
 
-            if(getIsOverNetworkSetting() && getIsCurrentPlayerHostSetting()){
-                NetworkUtils.sendData(new DataWrapper(
-                        DataType.BOARD,
-                        new Board(
-                                tiles,
-                                null,
-                                gpBoard
-                        )
-                ));
+    private void generateBoardFromTiles(List<Tile> tiles) {
+
+        tiles.forEach((tile)->{
+            final GridPane tileGridPane = new GridPane();
+
+            Label label = new Label();
+            label.setText((tile.getId() + 1) + "");
+
+            tileGridPane.add(label, 1, 1);
+
+            if(tile.getPlayersOnTile().size() > 0){
+                tile.getPlayersOnTile().forEach((player -> {
+                    switch (player.getId()) {
+                        case 0 -> {
+                            var playerIcon = GlyphsDude.createIcon(FontAwesomeIcons.USER);
+
+                            Label player1Label = new Label();
+                            player1Label.setText(player.getName());
+                            player1Label.setWrapText(true);
+                            player1Label.setStyle("-fx-text-fill: " + player.getColor() + ";");
+
+                            playerIcon.setStyle("-fx-fill: " + player.getColor() + ";");
+                            playerIcon.setStyle("-fx-font-family: FontAwesome" );
+
+                            VBox player1 = new VBox();
+                            player1.getChildren().add(playerIcon);
+                            player1.getChildren().add(player1Label);
+
+                            player1.setAlignment(Pos.CENTER);
+
+                            tileGridPane.add(player1, 0, 1);
+                            player.setPlayerColumn(0);
+                            player.setPlayerRow(1);
+                            setPlayerAsCurrent(player);
+                        }
+                        case 1 -> {
+                            var playerIcon = GlyphsDude.createIcon(FontAwesomeIcons.USER);
+
+                            Label player2Label = new Label();
+                            player2Label.setText(player.getName());
+                            player2Label.setWrapText(true);
+                            player2Label.setStyle("-fx-text-fill: " + player.getColor() + ";");
+
+                            playerIcon.setStyle("-fx-fill: " + player.getColor() + ";");
+                            playerIcon.setStyle("-fx-font-family: FontAwesome" );
+
+                            VBox player2 = new VBox();
+                            player2.getChildren().add(playerIcon);
+                            player2.getChildren().add(player2Label);
+
+                            player2.setAlignment(Pos.CENTER);
+
+                            tileGridPane.add(player2, 2, 1);
+                            player.setPlayerColumn(2);
+                            player.setPlayerRow(1);
+                        }
+                        case 2 -> {
+                            var playerIcon = GlyphsDude.createIcon(FontAwesomeIcons.USER);
+
+                            Label player3Label = new Label();
+                            player3Label.setText(player.getName());
+                            player3Label.setWrapText(true);
+                            player3Label.setStyle("-fx-text-fill: " + player.getColor() + ";");
+
+                            playerIcon.setStyle("-fx-fill: " + player.getColor() + ";");
+                            playerIcon.setStyle("-fx-font-family: FontAwesome" );
+
+                            VBox player3 = new VBox();
+                            player3.getChildren().add(playerIcon);
+                            player3.getChildren().add(player3Label);
+
+                            player3.setAlignment(Pos.CENTER);
+
+                            tileGridPane.add(player3, 1, 0);
+                            player.setPlayerColumn(1);
+                            player.setPlayerRow(0);
+                        }
+                        case 3 -> {
+                            var playerIcon = GlyphsDude.createIcon(FontAwesomeIcons.USER);
+
+                            Label player4Label = new Label();
+                            player4Label.setText(player.getName());
+                            player4Label.setWrapText(true);
+                            player4Label.setStyle("-fx-text-fill: " + player.getColor() + ";");
+
+                            playerIcon.setStyle("-fx-fill: " + player.getColor() + ";");
+                            playerIcon.setStyle("-fx-font-family: FontAwesome" );
+
+                            VBox player4 = new VBox();
+                            player4.getChildren().add(playerIcon);
+                            player4.getChildren().add(player4Label);
+
+                            player4.setAlignment(Pos.CENTER);
+
+                            tileGridPane.add(player4, 1, 2);
+                            player.setPlayerColumn(1);
+                            player.setPlayerRow(2);
+                        }
+                    }
+                }));
+            }
+            else {
+                tileGridPane.add(new VBox(), 0, 1);
+                tileGridPane.add(new VBox(), 2, 1);
+                tileGridPane.add(new VBox(), 1, 0);
+                tileGridPane.add(new VBox(), 1, 2);
+            }
+
+            if(tile.getLadderEndId() != null){
+                Label ladderLabel = new Label();
+                ladderLabel.setText(tile.getLadderEndId() + "");
+                ladderLabel.setStyle("-fx-text-fill: #774b03;");
+                tileGridPane.add(ladderLabel, Ladder.getLadderEndColumn(), Ladder.getLadderEndRow());
+
+            }
+
+            if(tile.getLadderStartId() != null){
+                Label ladderLabel = new Label();
+                ladderLabel.setText(tile.getLadderStartId() + "");
+                ladderLabel.setStyle("-fx-text-fill: #774b03;");
+                tileGridPane.add(ladderLabel, Ladder.getLadderStartColumn(), Ladder.getLadderStartRow());
+            }
+
+            if(tile.getSnakeEndId() != null){
+                Label snakeLabel = new Label();
+                snakeLabel.setText("");
+                snakeLabel.setText(tile.getSnakeEndId()+"");
+                snakeLabel.setStyle("-fx-text-fill: #9500c6;");
+                tileGridPane.add(snakeLabel, Snake.getSnakeEndColumn(), Snake.getSnakeEndRow());
+            }
+
+            if(tile.getSnakeStartId() != null){
+                Label snakeLabel = new Label();
+                snakeLabel.setText("");
+                snakeLabel.setText(tile.getSnakeStartId()+"");
+                snakeLabel.setStyle("-fx-text-fill: #9500c6;");
+                tileGridPane.add(snakeLabel, Snake.getSnakeStartColumn(), Snake.getSnakeStartRow());
+
             }
 
 
+
+            var copyTileGridPane = addBackground(tileGridPane, boardBackgroundColor);
+            copyTileGridPane = calculateBorders(tileGridPane, tile.getColumnIndex(), tile.getRowIndex(), tile.getId(), tiles.size());
+
+            for (int tilePanelFormatter = 0; tilePanelFormatter < 3; tilePanelFormatter++) {
+                RowConstraints rc = new RowConstraints();
+                rc.setVgrow(Priority.SOMETIMES);
+                rc.setValignment(VPos.CENTER);
+                copyTileGridPane.getRowConstraints().add(rc);
+
+                ColumnConstraints cc = new ColumnConstraints();
+                cc.setHgrow(Priority.SOMETIMES);
+                cc.setHalignment(HPos.CENTER);
+                copyTileGridPane.getColumnConstraints().add(cc);
+            }
+
+            gpBoard.add(copyTileGridPane, tile.getColumnIndex(), tile.getRowIndex());
+        });
+
+        for (int i = 0; i < tiles.size() / 10; i++) {
+            RowConstraints rc = new RowConstraints();
+            rc.setVgrow(Priority.SOMETIMES);
+            rc.setPercentHeight(100);
+            gpBoard.getRowConstraints().add(rc);
+        }
+
+        for (int i = 0; i < 10; i++) {
+            ColumnConstraints cc = new ColumnConstraints();
+            cc.setHgrow(Priority.SOMETIMES);
+            cc.setPercentWidth(100);
+            gpBoard.getColumnConstraints().add(cc);
+        }
     }
 
     /**
@@ -706,78 +887,79 @@ public class BoardController extends MyController implements Initializable {
      * @return GridPane object with assigned borders
      */
     private GridPane calculateBorders(GridPane pane, int column, int row, int id, int maxTiles) {
+        GridPane newPane;
         if (id == 0) {
-            pane = addSolidBorder(pane, borderColor, borderColor, null, borderColor, 0);
+            newPane = addSolidBorder(pane, borderColor, borderColor, null, borderColor, 0);
         }
         else if ((maxTiles / 10) % 2 == 0) {
             //last tile
             if (id == maxTiles - 1) {
-                pane = addSolidBorder(pane, borderColor, borderColor, null, borderColor, 0);
+                newPane = addSolidBorder(pane, borderColor, borderColor, null, borderColor, 0);
             }
             //right column
             else if (column == 9) {
                 //even rows
                 if (row % 2 == 0) {
-                    pane = addSolidBorder(pane, borderColor, null, borderColor, null, 0);
+                    newPane = addSolidBorder(pane, borderColor, null, borderColor, null, 0);
                 }
                 //odd rows
                 else {
-                    pane = addSolidBorder(pane, null, borderColor, borderColor, null, 0);
+                    newPane = addSolidBorder(pane, null, borderColor, borderColor, null, 0);
                 }
             }
             //left column
             else if (column == 0) {
                 //even rows
                 if (row % 2 == 0) {
-                    pane = addSolidBorder(pane, null, borderColor, null, borderColor, 0);
+                    newPane = addSolidBorder(pane, null, borderColor, null, borderColor, 0);
                 }
                 //odd rows
                 else {
-                    pane = addSolidBorder(pane, borderColor, null, null, borderColor, 0);
+                    newPane = addSolidBorder(pane, borderColor, null, null, borderColor, 0);
 
                 }
             } else {
-                pane = addSolidBorder(pane, borderColor, borderColor, null, null, 0);
+                newPane = addSolidBorder(pane, borderColor, borderColor, null, null, 0);
             }
         }
         else {
             //last tile
             if (id == maxTiles - 1) {
-                pane = addSolidBorder(pane, borderColor, borderColor, borderColor, null, 0);
+                newPane = addSolidBorder(pane, borderColor, borderColor, borderColor, null, 0);
             }
             //right column
             else if (column == 9) {
 
                 //even rows
                 if (row % 2 == 0) {
-                    pane = addSolidBorder(pane, null, borderColor, borderColor, null, 0);
+                    newPane = addSolidBorder(pane, null, borderColor, borderColor, null, 0);
                 }
                 //odd rows
                 else {
-                    pane = addSolidBorder(pane, borderColor, null, borderColor, null, 0);
+                    newPane = addSolidBorder(pane, borderColor, null, borderColor, null, 0);
                 }
             }
             //left column
             else if (column == 0) {
                 //even rows
                 if (row % 2 == 0) {
-                    pane = addSolidBorder(pane, borderColor, null, null, borderColor, 0);
+                    newPane = addSolidBorder(pane, borderColor, null, null, borderColor, 0);
                 }
                 //odd rows
                 else {
-                    pane = addSolidBorder(pane, null, borderColor, null, borderColor, 0);
+                    newPane = addSolidBorder(pane, null, borderColor, null, borderColor, 0);
                 }
 
             }
             //in between outermost columns
             else {
-                pane = addSolidBorder(pane, borderColor, borderColor, null, null, 0);
+                newPane = addSolidBorder(pane, borderColor, borderColor, null, null, 0);
             }
 
         }
 
 
-        return pane;
+        return newPane;
     }
 
     /**
@@ -825,8 +1007,8 @@ public class BoardController extends MyController implements Initializable {
 
     private List<Player> getCurrentGamePlayersSetting() {
         Type listType = new TypeToken<List<Player>>() {}.getType();
-        LogUtils.logInfo(settings.get(SettingsEnum.NUMBER_OF_PLAYERS).toString());
-        return new Gson().fromJson(settings.get(SettingsEnum.NUMBER_OF_PLAYERS).toString(),listType);
+        LogUtils.logInfo(settings.get(SettingsEnum.PLAYERS).toString());
+        return new Gson().fromJson(settings.get(SettingsEnum.PLAYERS).toString(),listType);
     }
 
     /**

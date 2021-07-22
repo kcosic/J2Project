@@ -10,7 +10,7 @@ public class MyController {
     public Socket clientSocket = null;
 
     public MyController() {
-         settings = FileUtils.loadSettings();
+        settings = FileUtils.loadSettings();
     }
 
     public MyController(Socket clientSocket){

@@ -40,8 +40,6 @@ public class HotseatGameOptionsController extends MyController implements Initia
     public Button btnStart;
     @FXML
     public Button btnBack;
-    @FXML
-    public VBox vbMultiplayer;
 
     @FXML
     public StackPane spMain;
@@ -72,7 +70,7 @@ public class HotseatGameOptionsController extends MyController implements Initia
         settings.replace(SettingsEnum.NUMBER_OF_SNAKES, tfSnakes.getText());
         settings.replace(SettingsEnum.NUMBER_OF_PLAYERS, tfPlayers.getText());
         settings.replace(SettingsEnum.NUMBER_OF_LADDERS, tfLadders.getText());
-        settings.replace(SettingsEnum.IS_HARD_GAME, chkHardGame.isSelected());
+        settings.replace(SettingsEnum.IS_HARD_GAME, String.valueOf(chkHardGame.isSelected()));
         super.saveSettings(settings);
     }
 

@@ -65,7 +65,7 @@ public class GameServer {
                 e.printStackTrace();
             }
             while (true) {
-                ClientHandler newClient = null;
+                ClientHandler newClient;
                 try {
                     LogUtils.logInfo("Server is listening");
                     var newClientSocket = serverSocket.accept();
@@ -92,7 +92,7 @@ public class GameServer {
 
         /**
          * Triggers start of the game
-         * @param data
+         * @param data Flag for players that the game has been started.
          */
         public static void startGame(DataWrapper data){
             for (var client : clients) {
@@ -140,7 +140,7 @@ public class GameServer {
 
         /**
          * Stops server thread, all client connections and closes server socket
-         * @throws IOException
+         * @throws IOException Is thrown if there is an error while trying to stop client connection
          */
         public void stopServerThread() throws IOException {
             for (var client : clients) {
@@ -167,7 +167,7 @@ public class GameServer {
         private final Socket clientSocket;
 
 
-        public ClientHandler(Socket socket, boolean isHost) throws IOException {
+        public ClientHandler(Socket socket, boolean isHost) {
             this.clientSocket = socket;
             this.isHost = isHost;
             setDaemon(true);
@@ -185,14 +185,16 @@ public class GameServer {
                 while(!exit){
 
                     try {
-                        var data = (DataWrapper)(new ObjectInputStream(clientSocket.getInputStream())).readObject();
-                        SortData(data);
-                    }
-                    catch (EOFException e) {
+                        if(readThread.isInterrupted()){
+                            exit = true;
+                        }
+                        else {
+                            var data = (DataWrapper) (new ObjectInputStream(clientSocket.getInputStream())).readObject();
+                            SortData(data);
+                        }
+                    }catch(SocketException | EOFException e){
                         exit = true;
-
-                    }
-                    catch (IOException | ClassNotFoundException e) {
+                    } catch (IOException | ClassNotFoundException e) {
                         e.printStackTrace();
                     }
 
@@ -203,7 +205,7 @@ public class GameServer {
 
         /**
          * Parses data that client has sent and sorts it out for further crunch
-         * @param data
+         * @param data DataWrapper object that is received from the client
          */
         private void SortData(DataWrapper data) {
             try{
@@ -220,10 +222,10 @@ public class GameServer {
 
         /**
          * Deals with the player data that was received. Creates a new Player with same property values but assigns it a new ID and sends it to the host.
-         * @param data
+         * @param data Player data
          */
         private void dealWithPlayer(Player data) {
-            player = new Player(ServerThread.COUNT, data.getName(), data.getColor());
+            player = new Player(ServerThread.COUNT - 1, data.getName(), data.getColor());
             ServerThread.COUNT++;
             ServerThread.sendToHost(new DataWrapper(DataType.PLAYER, player));
         }

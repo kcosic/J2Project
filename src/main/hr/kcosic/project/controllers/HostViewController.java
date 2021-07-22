@@ -23,6 +23,7 @@ import javafx.util.converter.IntegerStringConverter;
 
 import java.io.EOFException;
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.io.ObjectInputStream;
 import java.net.Socket;
 import java.net.URL;
@@ -74,20 +75,28 @@ public class HostViewController extends MyController implements Initializable {
             while(!exit){
 
                 try {
-                    var data = (DataWrapper)(new ObjectInputStream(clientSocket.getInputStream())).readObject();
-                    if (data.getType() == DataType.PLAYER) {
-                        Platform.runLater(()->{
-                            addPlayerToList((Player) data.getData());
-
-                        });
+                    if(receiveThread.isInterrupted()){
+                        exit = true;
                     }
+                    else {
+                        var data = (DataWrapper)(new ObjectInputStream(clientSocket.getInputStream())).readObject();
+                        if (data.getType() == DataType.PLAYER) {
+                            Platform.runLater(()-> addPlayerToList((Player) data.getData()));
+                        }
+                    }
+
 
                 } catch (EOFException e) {
                     exit = true;
 
-                } catch (IOException | ClassNotFoundException e) {
+                }
+                catch(InterruptedIOException e){
+                    LogUtils.logSevere("GOT FCKING INTERRUPTED... RUDE!");
+                }
+                catch (IOException | ClassNotFoundException e) {
                     e.printStackTrace();
                 }
+
 
             }
         });
@@ -98,23 +107,19 @@ public class HostViewController extends MyController implements Initializable {
     private void initializeComponents() {
         lvPlayers.itemsProperty().bind(listProperty);
         listProperty.set(playerNames);
-        lvPlayers.setCellFactory(list -> {
-            ListCell cell = new ListCell() {
-                @Override
-                public void updateItem(Object item, boolean empty) {
-                    super.updateItem(item, empty);
-                    if (empty || item == null) {
-                        setText(null);
-                    } else {
-                        setWrapText(true);
-                        setPrefWidth(10);
-                        setText(item.toString());
-                    }
+        lvPlayers.setCellFactory(list -> new ListCell<>() {
+            @Override
+            public void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                } else {
+                    setWrapText(true);
+                    setPrefWidth(10);
+                    setText(item);
                 }
+            }
 
-            };
-
-            return cell;
         });
         addIntegerMask(tfLadders);
         addIntegerMask(tfSnakes);
@@ -183,8 +188,7 @@ public class HostViewController extends MyController implements Initializable {
         runServer();
         receiveThread.start();
 
-        var me = new Player(0,tfName.getText(), tfName.getText());
-        players.add(me);
+        var me = new Player(0,tfName.getText(), "#ffffff");
         var data = new DataWrapper(DataType.PLAYER, me );
         NetworkUtils.sendData(data);
         tfName.setDisable(true);
@@ -194,9 +198,11 @@ public class HostViewController extends MyController implements Initializable {
     public void start() throws IOException {
 
         var data = new DataWrapper(DataType.START_GAME, true );
+        receiveThread.interrupt();
         NetworkUtils.sendData(data);
         settings.put(SettingsEnum.IS_CURRENT_PLAYER_HOST, String.valueOf(true));
         settings.put(SettingsEnum.PLAYERS, SerializationUtils.serialize(players));
+        settings.put(SettingsEnum.NUMBER_OF_PLAYERS, String.valueOf(players.size()));
         LogUtils.logInfo("Players that are passed to the game:");
         LogUtils.logInfo(new GsonBuilder().create().toJson(players));
         saveSettings(settings);
@@ -205,6 +211,7 @@ public class HostViewController extends MyController implements Initializable {
     }
     @FXML
     public void back() throws IOException {
+        GameServer.stop();
         SceneUtils.createAndReplaceStage(ViewEnum.NETWORK_GAME_OPTIONS, "Network game", settings);
     }
 }

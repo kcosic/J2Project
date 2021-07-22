@@ -27,6 +27,7 @@ public class JoinViewController extends MyController implements Initializable {
     @FXML
     public TextField tfAddress;
 
+    private Thread newThread;
 
     @Override
     public void initialize(URL url, ResourceBundle resourceBundle) {
@@ -51,25 +52,32 @@ public class JoinViewController extends MyController implements Initializable {
         tfName.setDisable(true);
         tfAddress.setDisable(true);
 
-        var newThread = new Thread(() -> {
+        newThread = new Thread(() -> {
             LogUtils.logInfo("Client Waiting for data");
             var exit = false;
             while(!exit){
                 try {
-                    var data = (DataWrapper)(new ObjectInputStream(NetworkUtils.getSocket().getInputStream())).readObject();
-                    if(data.getType() == DataType.START_GAME){
-                        settings.put(SettingsEnum.CURRENT_GAME_PLAYER, SerializationUtils.serialize(data.getData()));
-                        settings.put(SettingsEnum.IS_CURRENT_PLAYER_HOST, String.valueOf(false));
-                        FileUtils.saveSettings(settings);
+                    if(newThread.isInterrupted()){
                         exit = true;
-                        Platform.runLater(()->{
-                            try {
-                                SceneUtils.createAndReplaceStage(ViewEnum.BOARD_VIEW, "Game", settings);
-                            } catch (IOException e) {
-                                e.printStackTrace();
-                            }
-                        });
                     }
+                    else {
+                        var data = (DataWrapper)(new ObjectInputStream(NetworkUtils.getSocket().getInputStream())).readObject();
+                        if(data.getType() == DataType.START_GAME){
+                            settings.put(SettingsEnum.CURRENT_GAME_PLAYER, SerializationUtils.serialize(data.getData()));
+                            settings.put(SettingsEnum.IS_CURRENT_PLAYER_HOST, String.valueOf(false));
+                            saveSettings(settings);
+                            exit = true;
+                            Platform.runLater(()->{
+                                try {
+                                    SceneUtils.createAndReplaceStage(ViewEnum.BOARD_VIEW, "Game", settings);
+                                    newThread.interrupt();
+                                } catch (IOException e) {
+                                    e.printStackTrace();
+                                }
+                            });
+                        }
+                    }
+
                 } catch (IOException | ClassNotFoundException e) {
                     e.printStackTrace();
                 }

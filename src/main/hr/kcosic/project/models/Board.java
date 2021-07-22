@@ -8,21 +8,11 @@ import java.util.List;
 public class Board implements Serializable {
     private List<Tile> tiles;
     private List<Player> players;
-    private GridPane gpBoard;
     public Board() {
     }
 
-    public GridPane getGpBoard() {
-        return gpBoard;
-    }
-
-    public void setGpBoard(GridPane gpBoard) {
-        this.gpBoard = gpBoard;
-    }
-
-    public Board(List<Tile> tiles, List<Player> players, GridPane gpBoard) {
+    public Board(List<Tile> tiles, List<Player> players) {
         this.tiles = tiles;
-        this.gpBoard = gpBoard;
         this.players = players;
     }
 

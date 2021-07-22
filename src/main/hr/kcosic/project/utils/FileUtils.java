@@ -5,12 +5,16 @@
  */
 package main.hr.kcosic.project.utils;
 
+import java.awt.*;
 import java.io.*;
+import java.util.prefs.Preferences;
 import java.util.stream.Stream;
 import java.util.Properties;
 
 import javafx.stage.FileChooser;
 import javafx.stage.Window;
+import main.hr.kcosic.project.models.exceptions.SettingsException;
+
 import javax.swing.filechooser.FileSystemView;
 
 public class FileUtils {
@@ -20,11 +24,9 @@ public class FileUtils {
     public static File uploadFileDialog(Window owner, String...extensions) {
         FileChooser chooser = new FileChooser();
         chooser.setInitialDirectory(FileSystemView.getFileSystemView().getHomeDirectory());
-        Stream.of(extensions).forEach(e -> {
-            chooser.getExtensionFilters().add(
-                    new FileChooser.ExtensionFilter(e.toUpperCase(), "*." + e)
-            );
-        });
+        Stream.of(extensions).forEach(e -> chooser.getExtensionFilters().add(
+                new FileChooser.ExtensionFilter(e.toUpperCase(), "*." + e)
+        ));
         chooser.setTitle(LOAD);
         return chooser.showOpenDialog(owner);
     }
@@ -32,11 +34,9 @@ public class FileUtils {
     public static File saveFileDialog(Window owner, String...extensions) throws IOException {
         FileChooser chooser = new FileChooser();
         chooser.setInitialDirectory(FileSystemView.getFileSystemView().getHomeDirectory());
-        Stream.of(extensions).forEach(e -> {
-            chooser.getExtensionFilters().add(
-                    new FileChooser.ExtensionFilter(e.toUpperCase(), "*." + e)
-            );
-        });
+        Stream.of(extensions).forEach(e -> chooser.getExtensionFilters().add(
+                new FileChooser.ExtensionFilter(e.toUpperCase(), "*." + e)
+        ));
         chooser.setTitle(SAVE);
         File file = chooser.showSaveDialog(owner);
         if (file != null) {
@@ -45,46 +45,41 @@ public class FileUtils {
         return file;
     }
 
-
-    private static void CreateNewSettings(String path) throws IOException {
-        /*var settings =new HashMap<String, Object>(){{
-            put("numberOfTiles","100");
-            put("numberOfPlayers","4");
-            put("isOverNetwork","false");
-            put("isHardGame","false");
-            put("numberOfSnakes","5");
-            put("numberOfLadders","1");
-            put("fullscreen","false");
-            put("resolution","1280x1024");
-        }};
-        File file = new File(path);
-        file.createNewFile();
-        try ( Writer writer = new FileWriter(FileUtils.class.getResource(path).getPath())){
-            StringBuilder sb = new StringBuilder();
-            for (Map.Entry<String, Object> entry : settings.entrySet()) {
-                String key = entry.getKey();
-                Object value = entry.getValue();
-
-                sb.append(key);
-                sb.append("=");
-                sb.append(value.toString());
-                sb.append(System.getProperty("line.separator"));
-            }
-            writer.write(sb.toString());
-
-        }*/
-    }
-
-    public static Properties loadSettings() {
+    public static Properties loadSettings(){
 
         Properties settings = new Properties();
-
-        try (InputStream input = FileUtils.class.getResourceAsStream("/settings.properties")) {
+        try (InputStream settingsIS = new FileInputStream("/settings.properties")) {
             // load a properties file
-            settings.load(input);
-        } catch (IOException ex) {
-            ex.printStackTrace();
+            settings.load(settingsIS);
+            if(settings.size() == 0){
+                throw new SettingsException("Settings are empty");
+            }
+        } catch (IOException | SettingsException e) {
+            e.printStackTrace();
+            try {
+                settings = createNewSettings();
+                File file = new File("/settings.properties");
+                file.createNewFile();
+                saveSettings(settings);
+
+            } catch (IOException ioException) {
+                ioException.printStackTrace();
+            }
         }
+
+        return settings;
+    }
+
+    private static Properties createNewSettings() {
+        var settings = new Properties();
+        settings.put("numberOfTiles","100");
+        settings.put("numberOfPlayers","4");
+        settings.put("isOverNetwork","false");
+        settings.put("isHardGame","false");
+        settings.put("numberOfSnakes","5");
+        settings.put("numberOfLadders","1");
+        settings.put("fullscreen","false");
+        settings.put("resolution","1280x1024");
         return settings;
     }
 
@@ -97,14 +92,8 @@ public class FileUtils {
 
     public static void saveSettings(Properties settings){
         try (OutputStream output = new FileOutputStream("/settings.properties")) {
-            var copy = new Properties();
-
-            settings.forEach((key,value)->{
-                LogUtils.logConfig(key.toString() + "->" + value.toString());
-            });
             // save properties to project root folder
             settings.store(output, null);
-
         } catch (IOException io) {
             io.printStackTrace();
         }
