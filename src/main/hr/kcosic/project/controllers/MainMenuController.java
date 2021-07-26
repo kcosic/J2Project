@@ -13,7 +13,7 @@ import javafx.scene.layout.BorderPane;
 import java.net.URL;
 import java.util.ResourceBundle;
 
-public class MainMenuController extends MyController implements Initializable {
+public class MainMenuController extends MyController {
 
     @FXML
     public Button btnOptions;
@@ -35,9 +35,7 @@ public class MainMenuController extends MyController implements Initializable {
     @FXML
     public void newGame() {
         try {
-
-
-            SceneUtils.createAndReplaceStage(ViewEnum.NEW_GAME_VIEW, "New game",settings);
+            goToNextStage(ViewEnum.NEW_GAME_VIEW, "New game");
         } catch (Exception e) {
             //Dialog to catch exception
             LogUtils.logInfo(e.getMessage());
@@ -59,7 +57,7 @@ public class MainMenuController extends MyController implements Initializable {
     @FXML
     public void options() {
         try {
-            SceneUtils.createAndReplaceStage(ViewEnum.OPTIONS_VIEW, "Options", settings);
+            goToNextStage(ViewEnum.OPTIONS_VIEW, "Options");
         } catch (Exception e) {
             //Dialog to catch exception
             //SceneUtils.log(e.getMessage());

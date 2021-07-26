@@ -9,8 +9,12 @@ import javafx.stage.Stage;
 public class Main extends Application {
 
     @Override
-    public void start(Stage primaryStage) throws Exception{
-        SceneUtils.createStage(ViewEnum.MAIN_MENU_VIEW, "Main menu", FileUtils.loadSettings()).show();
+    public void start(Stage primaryStage){
+        try {
+            SceneUtils.createStage(ViewEnum.MAIN_MENU_VIEW.toString(), "Main menu", FileUtils.loadSettings()).show();
+        } catch (Exception e){
+            e.printStackTrace();
+        }
     }
 
     public static void main(String[] args) {

@@ -18,7 +18,6 @@ import javafx.beans.property.SimpleListProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
-import javafx.fxml.Initializable;
 import javafx.geometry.HPos;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -44,7 +43,7 @@ import java.net.URL;
 import java.util.*;
 import java.util.List;
 
-public class BoardController extends MyController implements Initializable {
+public class BoardController extends MyController {
 
     @FXML
     public GridPane gpBoard;
@@ -77,6 +76,9 @@ public class BoardController extends MyController implements Initializable {
     private Thread readThread;
     private Socket clientSocket;
 
+    private GameState state = new GameState();
+
+    private List<Player> players = new ArrayList<>();
 
 
 
@@ -86,7 +88,7 @@ public class BoardController extends MyController implements Initializable {
             initializeComponents();
             initializeListeners();
             areSettingsEmpty();
-            if(isHotseatOrHost()){
+            if(isHotSeatOrHost()){
                 createBoard();
                 addSnakesAndLadders();
 
@@ -95,7 +97,7 @@ public class BoardController extends MyController implements Initializable {
                             DataType.BOARD,
                             new Board(
                                     tiles,
-                                    null
+                                    players
                             )
                     ));
                 }
@@ -107,7 +109,7 @@ public class BoardController extends MyController implements Initializable {
         }
     }
 
-    private boolean isHotseatOrHost() {
+    private boolean isHotSeatOrHost() {
         LogUtils.logInfo(((getIsOverNetworkSetting() && getIsCurrentPlayerHostSetting()) || !getIsOverNetworkSetting())+"");
         return (getIsOverNetworkSetting() && getIsCurrentPlayerHostSetting()) || !getIsOverNetworkSetting();
     }
@@ -162,17 +164,36 @@ public class BoardController extends MyController implements Initializable {
         LogUtils.logWarning("Copying board");
         tiles = data.getTiles();
         generateBoardFromTiles(tiles);
+        players = data.getPlayers();
         redraw();
 
     }
 
 
     private void crunchNewGameState(GameState data) {
-        LogUtils.logInfo(new Gson().toJson(data));
+
+        setPlayerAsCurrent(data.getCurrentPlayer());
+        var previousTile = (GridPane)getNodeFromGridPane(gpBoard, data.getPreviousTile().getColumnIndex(), data.getPreviousTile().getRowIndex());
+        var nextTile = (GridPane)getNodeFromGridPane(gpBoard, data.getNextTile().getColumnIndex(), data.getNextTile().getRowIndex());
+
+        try {
+            movePlayerFromTileToTile(previousTile, nextTile, data.getNextTile(), data.getPreviousPlayer());
+        } catch (BoardException e) {
+            e.printStackTrace();
+        }
+
+        dice = data.getRolledDice();
+        lblDiceResult.setText(dice + "");
+
+        state = new GameState();
     }
 
     private void crunchMessage(String data) {
-        LogUtils.logInfo(data);
+        try {
+            addToChat(data, false);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private void initializeComponents() {
@@ -355,12 +376,12 @@ public class BoardController extends MyController implements Initializable {
     public void rollDice() throws BoardException {
         dice = (((int) (Math.random() * 100)) % 6) + 1;
         lblDiceResult.setText(dice + "");
-
+        state.setRolledDice(dice);
         try {
-            movePlayerNTiles();
+            movePlayerNTiles(currentPlayer);
         } catch (EndOfBoardException e) {
             // if(!getIsHardGameSetting()){
-            finishGame();
+            finishGame(currentPlayer);
             // }
         } catch (IOException e) {
             e.printStackTrace();
@@ -369,21 +390,53 @@ public class BoardController extends MyController implements Initializable {
         switchPlayers();
     }
 
-    private void finishGame() {
-        MessageUtils.showMessage("Game finished", currentPlayer.getName().concat(" won the game!"), "Congratulations!", Alert.AlertType.INFORMATION);
+
+    private void finishGame(Player player) {
+        MessageUtils.showMessage("Game finished", player.getName().concat(" won the game!"), "Congratulations!", Alert.AlertType.INFORMATION);
     }
 
     /**
      * Logic for switching players after moving. It iterates through players by their ID. When it detects that last player is current player, it switches back to the first one.
      */
     private void switchPlayers() {
-        int nextPlayerId = getNextPLayerId();
 
         if (getIsOverNetworkSetting()) {
-            //network logic
-            throw new RuntimeException("Not implemented");
+            LogUtils.logSevere("CURRENT ->\n" + SerializationUtils.serialize(currentPlayer));
 
+            var currentPlayer = players.stream().filter((player)->{
+                if(player.getId() == this.currentPlayer.getId()){
+                    return true;
+                }
+                return false;
+            }).findFirst();
+
+            if(currentPlayer.isEmpty()){
+                throw new RuntimeException("Current player is not present!");
+            }
+
+            if(players.indexOf(currentPlayer.get()) + 1 >= players.size())
+            {
+                LogUtils.logInfo("SETTING FIRST PLAYER IN ARRAY");
+                state.setCurrentPlayer(players.get(0));
+            }
+            else {
+                LogUtils.logInfo("SETTING NEXT PLAYER IN ARRAY -> \n" + SerializationUtils.serialize(players.get(players.indexOf(currentPlayer.get()))));
+                state.setCurrentPlayer(players.get(players.indexOf(currentPlayer.get()) + 1));
+            }
+            setPlayerAsCurrent(state.getCurrentPlayer());
+            LogUtils.logWarning("SENT STATE -> " + SerializationUtils.serialize(state));
+            var send = new Thread(()->{
+                try {
+                    NetworkUtils.sendData(new DataWrapper(DataType.GAME_STATE, state));
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
+            //TODO send new gamestate
+            send.start();
         } else {
+            int nextPlayerId = getNextPLayerId();
+
             //hot seat logic
             boolean breakLoop = false;
             for (Tile tile : tiles) {
@@ -434,11 +487,13 @@ public class BoardController extends MyController implements Initializable {
      * @throws BoardException      is thrown when invalid state has been detected that is connected to the board state.
      * @throws EndOfBoardException is thrown when player is trying to move out of bounds of the board.
      */
-    private void movePlayerNTiles() throws BoardException, EndOfBoardException, IOException {
+    private void movePlayerNTiles(Player player) throws BoardException, EndOfBoardException, IOException {
         //TODO original player position is not removed, move player to another Tile object and remove him from currentPlayer variable
+        state.setPreviousPlayer(player);
+
         Tile currentTile = null;
         for (Tile tile : tiles) {
-            if (!tile.getPlayersOnTile().isEmpty() && tile.getPlayersOnTile().contains(currentPlayer)) {
+            if (!tile.getPlayersOnTile().isEmpty() && tile.getPlayersOnTile().contains(player)) {
                 currentTile = tile;
                 break;
             }
@@ -448,18 +503,10 @@ public class BoardController extends MyController implements Initializable {
             throw new BoardException("Can't find current tile");
         }
 
-        GridPane currentTileGridPane = (GridPane) getNodeFromGridPane(gpBoard, currentTile.getColumnIndex(), currentTile.getRowIndex());
+        state.setPreviousTile(currentTile);
 
-        if (currentTileGridPane == null) {
-            throw new BoardException("Can't find grid pane on current tile");
-        }
-        var currentPlayerPosition = ((VBox) getNodeFromGridPane(currentTileGridPane, currentPlayer.getPlayerColumn(), currentPlayer.getPlayerRow()));
 
-        if(currentPlayerPosition != null){
-            currentPlayerPosition.getChildren().clear();
-        }
-
-        currentTile.removePlayerFromTile(currentPlayer);
+        currentTile.removePlayerFromTile(player);
 
         Tile nextTile = null;
         for (Tile tile : tiles) {
@@ -471,7 +518,7 @@ public class BoardController extends MyController implements Initializable {
 
         if (nextTile == null) {
             if (currentTile.getId() + dice > getNumberOfTilesSetting()) {
-                throw new EndOfBoardException("Player ".concat(currentPlayer.getName()).concat(" can't progress because dice number goes over total board tiles."));
+                throw new EndOfBoardException("Player ".concat(player.getName()).concat(" can't progress because dice number goes over total board tiles."));
             }
             throw new BoardException("Can't find next tile");
         }
@@ -491,15 +538,48 @@ public class BoardController extends MyController implements Initializable {
                 }
             }
         }
-        GridPane nextTileGridPane = (GridPane) getNodeFromGridPane(gpBoard, nextTile.getColumnIndex(), nextTile.getRowIndex());
 
-        if (nextTileGridPane == null) {
+        var previousTileGridPane = (GridPane) getNodeFromGridPane(gpBoard, currentTile.getColumnIndex(), currentTile.getRowIndex());
+        var nextTileGridPane = (GridPane) getNodeFromGridPane(gpBoard, nextTile.getColumnIndex(), nextTile.getRowIndex());
+
+        movePlayerFromTileToTile(previousTileGridPane, nextTileGridPane, nextTile, player);
+
+        state.setNextTile(nextTile);
+
+        if (nextTile.getId() == getNumberOfTilesSetting() - 1) {
+            finishGame(player);
+        }
+
+        addToChat(player.getName() + " R: " + dice + ", " + (currentTile.getId() + 1) + " -> " + (nextTile.getId() + 1), true);
+    }
+
+    private void movePlayerFromTileToTile(GridPane gpPreviousTile, GridPane gpNextTile,  Tile nextTile, Player player) throws BoardException {
+
+        if (gpPreviousTile == null) {
+            throw new BoardException("Can't find grid pane on previous tile");
+        }
+        var currentPlayerPosition = ((VBox) getNodeFromGridPane(gpPreviousTile, player.getPlayerColumn(), player.getPlayerRow()));
+
+        if(currentPlayerPosition != null){
+            currentPlayerPosition.getChildren().clear();
+        }
+
+
+        if (gpNextTile == null) {
             throw new BoardException("Can't find grid pane on next tile");
         }
-        VBox nextTilePlayer = ((VBox) getNodeFromGridPane(nextTileGridPane, currentPlayer.getPlayerColumn(), currentPlayer.getPlayerRow()));
+
+        for (Tile tile : tiles) {
+            if (!tile.getPlayersOnTile().isEmpty() && tile.getPlayersOnTile().contains(player)) {
+                tile.removePlayerFromTile(player);
+                break;
+            }
+        }
+
+        VBox nextTilePlayer = ((VBox) getNodeFromGridPane(gpNextTile, player.getPlayerColumn(), player.getPlayerRow()));
 
         var playerIcon = GlyphsDude.createIcon(FontAwesomeIcons.USER);
-        playerIcon.setStyle("-fx-fill: " + currentPlayer.getColor() + ";");
+        playerIcon.setStyle("-fx-fill: " + player.getColor() + ";");
         playerIcon.setStyle("-fx-font-family: FontAwesome" );
 
 
@@ -507,9 +587,9 @@ public class BoardController extends MyController implements Initializable {
             nextTilePlayer.getChildren().add(playerIcon);
         }
 
-        var nextTilePlayerLabel = new Label(currentPlayer.getName());
+        var nextTilePlayerLabel = new Label(player.getName());
         nextTilePlayerLabel.setWrapText(true);
-        nextTilePlayerLabel.setStyle("-fx-text-fill: " + currentPlayer.getColor() + ";");
+        nextTilePlayerLabel.setStyle("-fx-text-fill: " + player.getColor() + ";");
         if (nextTilePlayer != null) {
             nextTilePlayer.getChildren().add(nextTilePlayerLabel);
         }
@@ -517,26 +597,17 @@ public class BoardController extends MyController implements Initializable {
             nextTilePlayer.setAlignment(Pos.CENTER);
         }
 
-        nextTile.addPlayerToTile(currentPlayer);
+        nextTile.addPlayerToTile(player);
 
-        if (nextTile.getId() == getNumberOfTilesSetting() - 1) {
-            finishGame();
-        }
 
-        addToChat(currentPlayer.getName() + " R: " + dice + ", " + (currentTile.getId() + 1) + " -> " + (nextTile.getId() + 1));
     }
 
-    private void addToChat(String text) throws IOException {
+    private void addToChat(String text, boolean sendToOtherPlayers) throws IOException {
         chat.add(text);
-        if(getIsOverNetworkSetting()){
+        if(getIsOverNetworkSetting() && sendToOtherPlayers){
             NetworkUtils.sendData(new DataWrapper(DataType.MESSAGE, text));
         }
-
     }
-
-
-
-
 
     /**
      * Generates initial board state with initial player positions.
@@ -654,6 +725,8 @@ public class BoardController extends MyController implements Initializable {
                                 player.setPlayerRow(2);
                             }
                         }
+
+                        players.add(player);
                     }
 
                 }
@@ -1401,7 +1474,7 @@ public class BoardController extends MyController implements Initializable {
 
           if(button.equals(ButtonType.OK)){
               try {
-                  SceneUtils.createAndReplaceStage(ViewEnum.HOTSEAT_GAME_OPTIONS, "Game options", settings);
+                  goToNextStage(ViewEnum.HOTSEAT_GAME_OPTIONS, "Game options");
               } catch (IOException e) {
                   e.printStackTrace();
               }

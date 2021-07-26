@@ -5,9 +5,8 @@
  */
 package main.hr.kcosic.project.utils;
 
-import java.awt.*;
 import java.io.*;
-import java.util.prefs.Preferences;
+import java.net.URI;
 import java.util.stream.Stream;
 import java.util.Properties;
 
@@ -20,6 +19,8 @@ import javax.swing.filechooser.FileSystemView;
 public class FileUtils {
     private static final String LOAD = "Load";
     private static final String SAVE = "Save";
+    private static Properties settings;
+    private static URI uri;
 
     public static File uploadFileDialog(Window owner, String...extensions) {
         FileChooser chooser = new FileChooser();
@@ -47,24 +48,34 @@ public class FileUtils {
 
     public static Properties loadSettings(){
 
-        Properties settings = new Properties();
-        try (InputStream settingsIS = new FileInputStream("/settings.properties")) {
-            // load a properties file
-            settings.load(settingsIS);
-            if(settings.size() == 0){
-                throw new SettingsException("Settings are empty");
-            }
-        } catch (IOException | SettingsException e) {
-            e.printStackTrace();
-            try {
-                settings = createNewSettings();
-                File file = new File("/settings.properties");
-                file.createNewFile();
-                saveSettings(settings);
+        if(uri == null){
+            File file = new File("./settings.properties");
+            uri = file.toURI();
+        }
 
-            } catch (IOException ioException) {
-                ioException.printStackTrace();
+        if(settings == null){
+
+            settings = new Properties();
+            try (InputStream settingsIS = new FileInputStream(uri.getPath())) {
+                // load a properties file
+                settings.load(settingsIS);
+                if(settings.size() == 0){
+                    throw new SettingsException("Settings are empty");
+                }
+            } catch (SettingsException | IOException e) {
+                LogUtils.logInfo("Settings weren't found, creating new.");
+                try {
+                    settings = createNewSettings();
+                    File file = new File(uri.getPath());
+                    file.createNewFile();
+                    saveSettings(settings);
+
+                } catch (IOException ioException) {
+                    e.printStackTrace();
+                }
             }
+
+            LogUtils.logWarning("LOADED-> \n" + SerializationUtils.serialize(settings));
         }
 
         return settings;
@@ -72,12 +83,6 @@ public class FileUtils {
 
     private static Properties createNewSettings() {
         var settings = new Properties();
-        settings.put("numberOfTiles","100");
-        settings.put("numberOfPlayers","4");
-        settings.put("isOverNetwork","false");
-        settings.put("isHardGame","false");
-        settings.put("numberOfSnakes","5");
-        settings.put("numberOfLadders","1");
         settings.put("fullscreen","false");
         settings.put("resolution","1280x1024");
         return settings;
@@ -91,9 +96,13 @@ public class FileUtils {
     }
 
     public static void saveSettings(Properties settings){
-        try (OutputStream output = new FileOutputStream("/settings.properties")) {
+
+        try (OutputStream output = new FileOutputStream(uri.getPath())) {
+            FileUtils.settings = settings;
             // save properties to project root folder
             settings.store(output, null);
+            LogUtils.logWarning("SAVED-> \n" + SerializationUtils.serialize(settings));
+
         } catch (IOException io) {
             io.printStackTrace();
         }

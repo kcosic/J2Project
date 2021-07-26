@@ -19,7 +19,7 @@ import java.util.*;
 /**
  * Controller for Options view.
  */
-public class OptionsController extends MyController implements Initializable {
+public class OptionsController extends MyController {
 
     @FXML
     public Button btnSave;
@@ -57,25 +57,19 @@ public class OptionsController extends MyController implements Initializable {
     }
 
     @FXML
-    public void cancel(ActionEvent event) throws IOException {
+    public void cancel() throws IOException {
 
-        SceneUtils.createAndReplaceStage(ViewEnum.MAIN_MENU_VIEW, "Main menu", settings);
-
-    }
-
-    @FXML
-    public void changeResolution(ActionEvent actionEvent) {
+        goToNextStage(ViewEnum.MAIN_MENU_VIEW, "Main menu");
 
     }
 
     @FXML
-    public void save(ActionEvent event) throws IOException {
-        saveSettings(settings);
-        SceneUtils.createAndReplaceStage(ViewEnum.MAIN_MENU_VIEW, "Main menu", settings);
+    public void changeResolution() {
+
     }
 
-    @Override
-    public void saveSettings(Properties settings) {
+    @FXML
+    public void save() throws IOException {
         if(cbResolution.getValue() != null)
         {
             if(settings.containsKey(SettingsEnum.RESOLUTION)){
@@ -90,6 +84,7 @@ public class OptionsController extends MyController implements Initializable {
 
         }
         settings.replace(SettingsEnum.FULLSCREEN, String.valueOf(chkFullscreen.isSelected()));
-        super.saveSettings(settings);
+        goToNextStage(ViewEnum.MAIN_MENU_VIEW, "Main menu");
     }
+
 }

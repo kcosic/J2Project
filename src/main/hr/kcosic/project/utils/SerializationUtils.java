@@ -9,7 +9,10 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.lang.reflect.Array;
 import java.lang.reflect.Type;
+import java.util.AbstractList;
+import java.util.List;
 
 public class SerializationUtils {
 
@@ -31,13 +34,9 @@ public class SerializationUtils {
         return gson.toJson(object);
     }
 
-
-    public static <T> T deserialize(String json){
-        Type t = new TypeToken<T>() {}.getType();
-        Gson gson = new GsonBuilder().setPrettyPrinting().create();
-        return gson.fromJson(json, t);
+    public static <T> T deserialize(String json, TypeToken<T> type){
+        return new Gson().fromJson(json, type.getType());
     }
-
 
 
 }

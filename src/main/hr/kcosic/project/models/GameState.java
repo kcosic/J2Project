@@ -6,16 +6,18 @@ public class GameState implements Serializable {
 
     private Tile previousTile;
     private Tile nextTile;
-    private Player nextPlayer;
+    private Player currentPlayer;
     private int rolledDice;
 
+    private Player previousPlayer;
     public GameState() {
     }
 
-    public GameState(Tile previousTile, Tile nextTile, Player nextPlayer, int rolledDice) {
+    public GameState(Tile previousTile, Tile nextTile, Player nextPlayer, Player previousPlayer, int rolledDice) {
         this.previousTile = previousTile;
         this.nextTile = nextTile;
-        this.nextPlayer = nextPlayer;
+        this.currentPlayer = nextPlayer;
+        this.previousPlayer = previousPlayer;
         this.rolledDice = rolledDice;
     }
 
@@ -35,12 +37,12 @@ public class GameState implements Serializable {
         this.nextTile = nextTile;
     }
 
-    public Player getNextPlayer() {
-        return nextPlayer;
+    public Player getCurrentPlayer() {
+        return currentPlayer;
     }
 
-    public void setNextPlayer(Player nextPlayer) {
-        this.nextPlayer = nextPlayer;
+    public void setCurrentPlayer(Player currentPlayer) {
+        this.currentPlayer = currentPlayer;
     }
 
     public int getRolledDice() {
@@ -51,6 +53,14 @@ public class GameState implements Serializable {
         this.rolledDice = rolledDice;
     }
 
+
+    public Player getPreviousPlayer() {
+        return previousPlayer;
+    }
+
+    public void setPreviousPlayer(Player previousPlayer) {
+        this.previousPlayer = previousPlayer;
+    }
 
 
 }

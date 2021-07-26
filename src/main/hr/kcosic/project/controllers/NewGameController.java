@@ -11,7 +11,7 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.ResourceBundle;
 
-public class NewGameController extends MyController implements Initializable {
+public class NewGameController extends MyController {
     @FXML
     public Button btnHotSeatGame;
     @FXML
@@ -25,33 +25,21 @@ public class NewGameController extends MyController implements Initializable {
     }
 
     @FXML
-    public void newHotSeatGame() {
+    public void newHotSeatGame() throws IOException {
         settings.put(SettingsEnum.IS_OVER_NETWORK, String.valueOf(false));
-        saveSettings(settings);
-        try {
-            SceneUtils.createAndReplaceStage(ViewEnum.HOTSEAT_GAME_OPTIONS, "Setup", settings);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        goToNextStage(ViewEnum.HOTSEAT_GAME_OPTIONS, "Setup");
     }
 
     @FXML
-    public void newNetworkGame() {
+    public void newNetworkGame() throws IOException {
         settings.put(SettingsEnum.IS_OVER_NETWORK, String.valueOf(true));
-        saveSettings(settings);
-        try {
-            SceneUtils.createAndReplaceStage(ViewEnum.NETWORK_GAME_OPTIONS, "Network game", settings);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        goToNextStage(ViewEnum.NETWORK_GAME_OPTIONS, "Network game");
     }
 
     @FXML
-    public void back() {
-        try {
-            SceneUtils.createAndReplaceStage(ViewEnum.MAIN_MENU_VIEW, "Main menu", settings);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+    public void back() throws IOException {
+        settings.remove(SettingsEnum.IS_OVER_NETWORK);
+        goToNextStage(ViewEnum.MAIN_MENU_VIEW, "Main menu");
+
     }
 }

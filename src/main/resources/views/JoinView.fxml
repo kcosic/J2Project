@@ -9,7 +9,7 @@
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Font?>
 
-<BorderPane prefHeight="400.0" prefWidth="600.0" xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="main.hr.kcosic.project.controllers.JoinViewController">
+<BorderPane prefHeight="400.0" prefWidth="600.0" xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="main.hr.kcosic.project.controllers.JoinController">
    <bottom>
        <HBox alignment="CENTER" prefHeight="100.0" prefWidth="200.0" BorderPane.alignment="CENTER">
            <Button fx:id="btnBack" mnemonicParsing="false" onAction="#back" text="Back">
@@ -59,6 +59,11 @@
                   </HBox.margin>
                </TextField>
                </HBox>
+            <HBox alignment="CENTER" prefHeight="100.0" prefWidth="200.0">
+               <children>
+                  <Label fx:id="lblStatus" text="Not connected" />
+               </children>
+            </HBox>
          </children>
       </VBox>
    </center>
