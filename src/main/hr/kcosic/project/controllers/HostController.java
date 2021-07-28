@@ -93,9 +93,6 @@ public class HostController extends MyController {
                     exit = true;
 
                 }
-                catch(InterruptedIOException e){
-                    LogUtils.logSevere("GOT FCKING INTERRUPTED... RUDE!");
-                }
                 catch (IOException | ClassNotFoundException e) {
                     e.printStackTrace();
                 }
@@ -181,7 +178,7 @@ public class HostController extends MyController {
         runServer();
         receiveThread.start();
 
-        var me = new Player(0,tfName.getText(), toHexString(cpPlayerColor.getValue()));
+        var me = new Player(0,tfName.getText(), null, null);
         var data = new DataWrapper(DataType.PLAYER, me );
         NetworkUtils.sendData(data);
         settings.put(SettingsEnum.CURRENT_GAME_PLAYER, SerializationUtils.serialize(me));

@@ -74,7 +74,7 @@ public class JoinController extends MyController {
 
         if(hasConnection){
             lblStatus.setText("Connected, waiting for host to start the game." );
-            var player = new DataWrapper(DataType.PLAYER, new Player(0, tfName.getText(), toHexString(cpColor.getValue())));
+            var player = new DataWrapper(DataType.PLAYER, new Player(0, tfName.getText(), null, null));
             NetworkUtils.sendData(player);
             btnConnect.setDisable(true);
             cpColor.setDisable(true);

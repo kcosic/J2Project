@@ -47,7 +47,7 @@
                   </HBox.margin>
                </Label>
                <TextField fx:id="tfTiles" disable="true" maxWidth="-Infinity" prefWidth="50.0" />
-               <Slider fx:id="slTiles" majorTickUnit="10.0" max="220.0" min="60.0" minorTickCount="0" prefWidth="200.0" showTickLabels="true" showTickMarks="true" snapToTicks="true" value="100.0">
+               <Slider fx:id="slTiles" majorTickUnit="10.0" max="200.0" min="60.0" minorTickCount="0" prefWidth="200.0" showTickLabels="true" showTickMarks="true" snapToTicks="true" value="100.0">
                   <HBox.margin>
                      <Insets left="30.0" />
                   </HBox.margin>

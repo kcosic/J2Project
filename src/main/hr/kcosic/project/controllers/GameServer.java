@@ -3,6 +3,7 @@ package main.hr.kcosic.project.controllers;
 import main.hr.kcosic.project.models.DataWrapper;
 import main.hr.kcosic.project.models.Player;
 import main.hr.kcosic.project.models.enums.DataType;
+import main.hr.kcosic.project.models.enums.SvgEnum;
 import main.hr.kcosic.project.utils.LogUtils;
 
 import java.io.*;
@@ -226,9 +227,29 @@ public class GameServer {
          * @param data Player data
          */
         private void dealWithPlayer(Player data) {
-            player = new Player(ServerThread.COUNT - 1, data.getName(), data.getColor());
+            player = new Player(ServerThread.COUNT - 1, data.getName(), getPlayerColor(), getPlayerPawn());
             ServerThread.COUNT++;
             ServerThread.sendToHost(new DataWrapper(DataType.PLAYER, player));
+        }
+
+        private SvgEnum getPlayerPawn() {
+            return switch (ServerThread.clients.size()) {
+                case 0 -> SvgEnum.PAWN_BLUE;
+                case 1 -> SvgEnum.PAWN_RED;
+                case 2 -> SvgEnum.PAWN_GREEN;
+                case 3 -> SvgEnum.PAWN_YELLOW;
+                default -> null;
+            };
+        }
+
+        private String getPlayerColor() {
+            return switch (ServerThread.clients.size()) {
+                case 0 -> "blue";
+                case 1 -> "red";
+                case 2 -> "green";
+                case 3 -> "#b7b219";
+                default -> null;
+            };
         }
 
 

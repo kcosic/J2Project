@@ -1,5 +1,7 @@
 package main.hr.kcosic.project.models;
 
+import main.hr.kcosic.project.models.enums.SvgEnum;
+
 import java.io.Serializable;
 import java.util.Objects;
 
@@ -7,15 +9,18 @@ public class Player implements Serializable {
     private final int id;
     private String name;
     private String color;
+
+    private SvgEnum pawn;
     private Tile currentTile;
 
     private int playerRow;
     private int playerColumn;
 
-    public Player(int id, String name, String color) {
+    public Player(int id, String name, String color, SvgEnum pawn) {
         this.id = id;
         this.name = name;
         this.color = color;
+        this.pawn = pawn;
     }
 
     public int getPlayerRow() {
@@ -54,6 +59,13 @@ public class Player implements Serializable {
         this.color = color;
     }
 
+    public SvgEnum getPawn() {
+        return pawn;
+    }
+
+    public void setPawn(SvgEnum pawn) {
+        this.pawn = pawn;
+    }
 
     public Tile getCurrentTile() {
         return currentTile;

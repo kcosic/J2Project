@@ -74,8 +74,6 @@ public class FileUtils {
                     e.printStackTrace();
                 }
             }
-
-            LogUtils.logWarning("LOADED-> \n" + SerializationUtils.serialize(settings));
         }
 
         return settings;
@@ -99,10 +97,8 @@ public class FileUtils {
 
         try (OutputStream output = new FileOutputStream(uri.getPath())) {
             FileUtils.settings = settings;
-            // save properties to project root folder
-            settings.store(output, null);
-            LogUtils.logWarning("SAVED-> \n" + SerializationUtils.serialize(settings));
 
+            settings.store(output, null);
         } catch (IOException io) {
             io.printStackTrace();
         }

@@ -9,7 +9,7 @@ public enum SvgEnum implements Serializable {
     PAWN_YELLOW("yellow pawn"),
     PAWN_BLUE("blue pawn"),
     PAWN_RED("red pawn"),
-    PAWN_GREEN("green pawn"),
+    PAWN_GREEN("greeen pawn"),
     DICE("dices");
 
 

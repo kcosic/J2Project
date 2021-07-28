@@ -11,6 +11,7 @@ import main.hr.kcosic.project.models.enums.SvgEnum;
 import main.hr.kcosic.project.models.enums.ViewEnum;
 import main.hr.kcosic.project.models.exceptions.BoardException;
 import main.hr.kcosic.project.models.exceptions.EndOfBoardException;
+import main.hr.kcosic.project.models.exceptions.GameStateException;
 import main.hr.kcosic.project.models.exceptions.SettingsException;
 import main.hr.kcosic.project.utils.*;
 import javafx.application.Platform;
@@ -107,12 +108,24 @@ public class BoardController extends MyController {
 
             }
         } catch (SettingsException | IOException e) {
-            e.printStackTrace();
+            MessageUtils.showMessage("Error", "Unexpected state occurred", e.getMessage(), Alert.AlertType.ERROR).get();
+            try {
+                abortGame();
+            } catch (IOException ioException) {
+                ioException.printStackTrace();
+            }
+
+        } catch (BoardException e) {
+            MessageUtils.showMessage("Error", "Unexpected board state occurred", e.getMessage(), Alert.AlertType.ERROR).get();
+            try {
+                abortGame();
+            } catch (IOException ioException) {
+                ioException.printStackTrace();
+            }
         }
     }
 
     private boolean isHotSeatOrHost() {
-        LogUtils.logInfo(((getIsOverNetworkSetting() && getIsCurrentPlayerHostSetting()) || !getIsOverNetworkSetting())+"");
         return (getIsOverNetworkSetting() && getIsCurrentPlayerHostSetting()) || !getIsOverNetworkSetting();
     }
 
@@ -135,8 +148,7 @@ public class BoardController extends MyController {
         });
 
         if(getIsOverNetworkSetting()){
-            me = SerializationUtils.deserialize(settings.get(SettingsEnum.CURRENT_GAME_PLAYER).toString(), new TypeToken<>() {
-            });
+            me = SerializationUtils.deserialize(settings.get(SettingsEnum.CURRENT_GAME_PLAYER).toString(), new TypeToken<>() {});
 
             clientSocket = NetworkUtils.getSocket();
             readThread = new Thread(()->{
@@ -147,7 +159,6 @@ public class BoardController extends MyController {
                             exit = true;
                         }
                         else {
-                            LogUtils.logInfo("Waiting for game information");
                             var data = (DataWrapper)(new ObjectInputStream(clientSocket.getInputStream())).readObject();
                             switch (data.getType()){
                                 case MESSAGE -> Platform.runLater(()->crunchMessage((String)data.getData()));
@@ -174,7 +185,6 @@ public class BoardController extends MyController {
     }
 
     private void copyBoard(Board data) {
-        LogUtils.logWarning("Copying board");
         btnRoll.setDisable(true);
         tiles = data.getTiles();
         generateBoardFromTiles(tiles);
@@ -193,7 +203,9 @@ public class BoardController extends MyController {
         try {
             movePlayerFromTileToTile(previousTile, nextTile, data.getNextTile(), data.getPreviousPlayer());
         } catch (BoardException e) {
-            e.printStackTrace();
+            MessageUtils.showMessage("ERROR", "Board error:", e.getMessage(), Alert.AlertType.ERROR);
+        } catch (GameStateException e) {
+            MessageUtils.showMessage("ERROR", "Game state error:", e.getMessage(), Alert.AlertType.ERROR);
         }
 
         dice = data.getRolledDice();
@@ -208,7 +220,8 @@ public class BoardController extends MyController {
         try {
             addToChat(data, false);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            MessageUtils.showMessage("ERROR", "Unexpected error:", e.getMessage(), Alert.AlertType.ERROR);
+            //throw new RuntimeException(e);
         }
     }
 
@@ -275,7 +288,7 @@ public class BoardController extends MyController {
             int startTileId = (int) ((Math.random() * Math.random()) * 1000000 % getNumberOfTilesSetting());
             int endTileId = (int) (Math.random() * 1000000 % getNumberOfTilesSetting());
 
-            if (startTileId < getNumberOfTilesSetting() - 10 && endTileId > startTileId && notInSameOrNextRow(startTileId, endTileId) && notOnEdgeOfMap(startTileId) && notOnEdgeOfMap(endTileId)) {
+            if (startTileId < getNumberOfTilesSetting() - 10 && endTileId > startTileId && notInSameOrNextRow(startTileId, endTileId) && notOnEdgeOfMap(startTileId) && notOnEdgeOfMap(endTileId) && startTileId != tiles.get(0).getId()) {
 
                 Tile startTile = tiles.get(startTileId);
                 Tile endTile = tiles.get(endTileId);
@@ -320,7 +333,7 @@ public class BoardController extends MyController {
             int startTileId = (int) ((Math.random() * Math.random()) * 1000000 % getNumberOfTilesSetting());
             int endTileId = (int) (Math.random() * 1000000 % getNumberOfTilesSetting());
 
-            if (startTileId >= 10 && endTileId < startTileId && notInSameOrNextRow(startTileId, endTileId) && notOnEdgeOfMap(startTileId) && notOnEdgeOfMap(endTileId)) {
+            if (startTileId >= 10 && endTileId < startTileId && notInSameOrNextRow(startTileId, endTileId) && notOnEdgeOfMap(startTileId) && notOnEdgeOfMap(endTileId) && startTileId != tiles.get(tiles.size() - 1).getId()) {
                 Tile startTile = tiles.get(startTileId);
                 Tile endTile = tiles.get(endTileId);
 
@@ -394,26 +407,42 @@ public class BoardController extends MyController {
     }
 
     @FXML
-    public void rollDice() throws BoardException {
+    public void rollDice() {
 
-        btnRoll.setDisable(true);
-        dice = (((int) (Math.random() * 100)) % 6) + 1;
-        lblDiceResult.setText(dice + "");
-        state.setRolledDice(dice);
         try {
-            movePlayerNTiles(currentPlayer);
-        } catch (EndOfBoardException e) {
-            if(!getIsHardGameSetting()){
-                finishGame(currentPlayer);
+            if(getIsOverNetworkSetting()){
+                btnRoll.setDisable(true);
             }
-            else{
-                //TODO hard ending logic
+            dice = (((int) (Math.random() * 100)) % 6) + 1;
+            lblDiceResult.setText(dice + "");
+            state.setRolledDice(dice);
+            movePlayerNTiles(currentPlayer);
+            switchPlayers();
+        } catch (EndOfBoardException e) {
+            if(!getIsHardGameSetting() && e.isRolledTooMuch()){
+                finishGame(currentPlayer);
+                disableControls();
+            }
+            else if (getIsHardGameSetting() && !e.isRolledTooMuch()){
+                finishGame(currentPlayer);
+                disableControls();
+            }
+            else {
+                try {
+                    addToChat(currentPlayer.getName() + " rolled " + dice + " which is too much. Turn skipped.", true);
+                    switchPlayers();
+                } catch (IOException | GameStateException ioException) {
+                    MessageUtils.showMessage("ERROR", "Unexpected error:", ioException.getMessage(), Alert.AlertType.ERROR);
+                }
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            MessageUtils.showMessage("ERROR", "Unexpected error:", e.getMessage(), Alert.AlertType.ERROR);
+        } catch (GameStateException e) {
+            MessageUtils.showMessage("ERROR", "Game state error:", e.getMessage(), Alert.AlertType.ERROR);
+        } catch (BoardException e) {
+            MessageUtils.showMessage("ERROR", "Board error:", e.getMessage(), Alert.AlertType.ERROR);
         }
 
-        switchPlayers();
     }
 
 
@@ -424,13 +453,13 @@ public class BoardController extends MyController {
     /**
      * Logic for switching players after moving. It iterates through players by their ID. When it detects that last player is current player, it switches back to the first one.
      */
-    private void switchPlayers() {
+    private void switchPlayers() throws GameStateException {
 
         if (getIsOverNetworkSetting()) {
             var currentPlayer = players.stream().filter((player)-> player.getId() == this.currentPlayer.getId()).findFirst();
 
             if(currentPlayer.isEmpty()){
-                throw new RuntimeException("Current player is not present!");
+                throw new GameStateException("Current player is not present!");
             }
 
             if(players.indexOf(currentPlayer.get()) + 1 >= players.size())
@@ -502,8 +531,10 @@ public class BoardController extends MyController {
      *
      * @throws BoardException      is thrown when invalid state has been detected that is connected to the board state.
      * @throws EndOfBoardException is thrown when player is trying to move out of bounds of the board.
+     * @throws IOException
+     * @throws GameStateException
      */
-    private void movePlayerNTiles(Player player) throws BoardException, EndOfBoardException, IOException {
+    private void movePlayerNTiles(Player player) throws BoardException, EndOfBoardException, IOException, GameStateException {
         state.setPreviousPlayer(player);
 
         Tile currentTile = null;
@@ -521,8 +552,6 @@ public class BoardController extends MyController {
         state.setPreviousTile(currentTile);
 
 
-        currentTile.removePlayerFromTile(player);
-
         Tile nextTile = null;
         for (Tile tile : tiles) {
             if (tile.getId() == currentTile.getId() + dice) {
@@ -532,22 +561,28 @@ public class BoardController extends MyController {
         }
 
         if (nextTile == null) {
-            if (currentTile.getId() + dice > getNumberOfTilesSetting()) {
-                throw new EndOfBoardException("Player ".concat(player.getName()).concat(" can't progress because dice number goes over total board tiles."));
+            if (currentTile.getId() + dice >= tiles.size()) {
+                addToChat(player.getName() + " R: " + dice + ", " + (currentTile.getId() + 1) + " -> " + (currentTile.getId() + dice + 1), true);
+                throw new EndOfBoardException("Player ".concat(player.getName()).concat(" can't progress because dice number goes over total board tiles."), true);
             }
             throw new BoardException("Can't find next tile");
         }
 
+        if(nextTile.getId() == tiles.get(tiles.size()-1).getId()){
+            addToChat(player.getName() + " R: " + dice + ", " + (currentTile.getId() + 1) + " -> " + (currentTile.getId() + dice + 1), true);
+            throw new EndOfBoardException("Player " + player.getName() + " got to the end!", false);
+        }
+
         if (nextTile.getLadderStartId() != null) {
             for (Tile tile : tiles) {
-                if (tile.getLadderEndId().equals(nextTile.getLadderStartId())) {
+                if (tile.getLadderEndId() != null && tile.getLadderEndId().intValue() == nextTile.getLadderStartId().intValue()) {
                     nextTile = tile;
                     break;
                 }
             }
         } else if (nextTile.getSnakeStartId() != null) {
             for (Tile tile : tiles) {
-                if (tile.getSnakeStartId().equals(nextTile.getSnakeEndId())) {
+                if (tile.getSnakeEndId() != null && tile.getSnakeEndId().intValue() == nextTile.getSnakeStartId().intValue()) {
                     nextTile = tile;
                     break;
                 }
@@ -558,6 +593,7 @@ public class BoardController extends MyController {
         var nextTileGridPane = (GridPane) getNodeFromGridPane(gpBoard, nextTile.getColumnIndex(), nextTile.getRowIndex());
 
         movePlayerFromTileToTile(previousTileGridPane, nextTileGridPane, nextTile, player);
+        currentTile.removePlayerFromTile(player);
 
         state.setNextTile(nextTile);
 
@@ -566,17 +602,18 @@ public class BoardController extends MyController {
         }
 
         addToChat(player.getName() + " R: " + dice + ", " + (currentTile.getId() + 1) + " -> " + (nextTile.getId() + 1), true);
+
     }
 
-    private void movePlayerFromTileToTile(GridPane gpPreviousTile, GridPane gpNextTile,  Tile nextTile, Player player) throws BoardException {
+    private void movePlayerFromTileToTile(GridPane gpPreviousTile, GridPane gpNextTile,  Tile nextTile, Player player) throws BoardException, GameStateException {
 
         if (gpPreviousTile == null) {
             throw new BoardException("Can't find grid pane on previous tile");
         }
         var currentPlayerPosition = ((VBox) getNodeFromGridPane(gpPreviousTile, player.getPlayerColumn(), player.getPlayerRow()));
 
-        if(currentPlayerPosition != null){
-            currentPlayerPosition.getChildren().clear();
+        if(currentPlayerPosition == null){
+            throw new GameStateException("Couldn't find position of the player " + player.getName());
         }
 
 
@@ -593,27 +630,11 @@ public class BoardController extends MyController {
 
         VBox nextTilePlayer = ((VBox) getNodeFromGridPane(gpNextTile, player.getPlayerColumn(), player.getPlayerRow()));
 
-        var playerIcon = GlyphsDude.createIcon(FontAwesomeIcons.USER);
-        playerIcon.setStyle("-fx-fill: " + player.getColor() + ";");
-        playerIcon.setStyle("-fx-font-family: FontAwesome" );
-
-
         if (nextTilePlayer != null) {
-            nextTilePlayer.getChildren().add(playerIcon);
-        }
-
-        var nextTilePlayerLabel = new Label(player.getName());
-        nextTilePlayerLabel.setWrapText(true);
-        nextTilePlayerLabel.setStyle("-fx-text-fill: " + player.getColor() + ";");
-        if (nextTilePlayer != null) {
-            nextTilePlayer.getChildren().add(nextTilePlayerLabel);
-        }
-        if (nextTilePlayer != null) {
-            nextTilePlayer.setAlignment(Pos.CENTER);
+            nextTilePlayer.getChildren().addAll(currentPlayerPosition.getChildren());
         }
 
         nextTile.addPlayerToTile(player);
-
 
     }
 
@@ -629,7 +650,7 @@ public class BoardController extends MyController {
      *
      * @throws SettingsException is thrown when any of the crucial settings are missing.
      */
-    private void createBoard() throws SettingsException {
+    private void createBoard() throws SettingsException, BoardException {
 
             if (!settings.containsKey(SettingsEnum.NUMBER_OF_TILES)) {
                 throw new SettingsException("Number of tiles parameter is missing.");
@@ -653,22 +674,26 @@ public class BoardController extends MyController {
 
                     for (int playerIndex = 0; playerIndex < numberOfPlayers; playerIndex++) {
                         Player player = tile.getPlayersOnTile().get(playerIndex);
+                        var svgSize = 20;
                         switch (player.getId()) {
                             case 0 -> {
-                                var playerIcon = GlyphsDude.createIcon(FontAwesomeIcons.USER);
-
                                 Label player1Label = new Label();
                                 player1Label.setText(player.getName());
                                 player1Label.setWrapText(true);
                                 player1Label.setStyle("-fx-text-fill: " + player.getColor() + ";");
 
-                                playerIcon.setStyle("-fx-fill: " + player.getColor() + ";");
-                                playerIcon.setStyle("-fx-font-family: FontAwesome" );
 
                                 VBox player1 = new VBox();
-                                player1.getChildren().add(playerIcon);
+                                var iv = SceneUtils.getImageFromSvg(player.getPawn());
+                                iv.setPreserveRatio(true);
+                                iv.fitWidthProperty().set(svgSize);
+                                iv.fitHeightProperty().set(svgSize);
+                                player1.getChildren().add(iv);
                                 player1.getChildren().add(player1Label);
 
+                              /*  player1.getChildren().forEach(child->{
+                                    child.
+                                });*/
                                 player1.setAlignment(Pos.CENTER);
 
                                 tileGridPane.add(player1, 0, 1);
@@ -677,18 +702,17 @@ public class BoardController extends MyController {
                                 setPlayerAsCurrent(player);
                             }
                             case 1 -> {
-                                var playerIcon = GlyphsDude.createIcon(FontAwesomeIcons.USER);
-
                                 Label player2Label = new Label();
                                 player2Label.setText(player.getName());
                                 player2Label.setWrapText(true);
                                 player2Label.setStyle("-fx-text-fill: " + player.getColor() + ";");
 
-                                playerIcon.setStyle("-fx-fill: " + player.getColor() + ";");
-                                playerIcon.setStyle("-fx-font-family: FontAwesome" );
-
                                 VBox player2 = new VBox();
-                                player2.getChildren().add(playerIcon);
+                                var iv = SceneUtils.getImageFromSvg(player.getPawn());
+                                iv.setPreserveRatio(true);
+                                iv.fitWidthProperty().set(svgSize);
+                                iv.fitHeightProperty().set(svgSize);
+                                player2.getChildren().add(iv);
                                 player2.getChildren().add(player2Label);
 
                                 player2.setAlignment(Pos.CENTER);
@@ -698,18 +722,17 @@ public class BoardController extends MyController {
                                 player.setPlayerRow(1);
                             }
                             case 2 -> {
-                                var playerIcon = GlyphsDude.createIcon(FontAwesomeIcons.USER);
-
                                 Label player3Label = new Label();
                                 player3Label.setText(player.getName());
                                 player3Label.setWrapText(true);
                                 player3Label.setStyle("-fx-text-fill: " + player.getColor() + ";");
 
-                                playerIcon.setStyle("-fx-fill: " + player.getColor() + ";");
-                                playerIcon.setStyle("-fx-font-family: FontAwesome" );
-
                                 VBox player3 = new VBox();
-                                player3.getChildren().add(playerIcon);
+                                var iv = SceneUtils.getImageFromSvg(player.getPawn());
+                                iv.setPreserveRatio(true);
+                                iv.fitWidthProperty().set(svgSize);
+                                iv.fitHeightProperty().set(svgSize);
+                                player3.getChildren().add(iv);
                                 player3.getChildren().add(player3Label);
 
                                 player3.setAlignment(Pos.CENTER);
@@ -730,7 +753,11 @@ public class BoardController extends MyController {
                                 playerIcon.setStyle("-fx-font-family: FontAwesome" );
 
                                 VBox player4 = new VBox();
-                                player4.getChildren().add(playerIcon);
+                                var iv = SceneUtils.getImageFromSvg(player.getPawn());
+                                iv.setPreserveRatio(true);
+                                iv.fitWidthProperty().set(svgSize);
+                                iv.fitHeightProperty().set(svgSize);
+                                player4.getChildren().add(iv);
                                 player4.getChildren().add(player4Label);
 
                                 player4.setAlignment(Pos.CENTER);
@@ -753,12 +780,14 @@ public class BoardController extends MyController {
                 }
                 for (int tilePanelFormatter = 0; tilePanelFormatter < 3; tilePanelFormatter++) {
                     RowConstraints rc = new RowConstraints();
-                    rc.setVgrow(Priority.SOMETIMES);
+                    rc.setVgrow(Priority.NEVER);
+                    rc.setPercentHeight(100);
                     rc.setValignment(VPos.CENTER);
                     tileGridPane.getRowConstraints().add(rc);
 
-                    ColumnConstraints cc = new ColumnConstraints();
-                    cc.setHgrow(Priority.SOMETIMES);
+                    ColumnConstraints cc = new ColumnConstraints(30);
+                    cc.setHgrow(Priority.NEVER);
+                    cc.setPercentWidth(100);
                     cc.setHalignment(HPos.CENTER);
                     tileGridPane.getColumnConstraints().add(cc);
                 }
@@ -786,6 +815,7 @@ public class BoardController extends MyController {
                 cc.setPercentWidth(100);
                 gpBoard.getColumnConstraints().add(cc);
             }
+
     }
 
 
@@ -800,21 +830,23 @@ public class BoardController extends MyController {
             tileGridPane.add(label, 1, 1);
 
             if(tile.getPlayersOnTile().size() > 0){
+                var svgSize = 20;
+
                 tile.getPlayersOnTile().forEach((player -> {
                     switch (player.getId()) {
                         case 0 -> {
-                            var playerIcon = GlyphsDude.createIcon(FontAwesomeIcons.USER);
-
                             Label player1Label = new Label();
                             player1Label.setText(player.getName());
                             player1Label.setWrapText(true);
                             player1Label.setStyle("-fx-text-fill: " + player.getColor() + ";");
 
-                            playerIcon.setStyle("-fx-fill: " + player.getColor() + ";");
-                            playerIcon.setStyle("-fx-font-family: FontAwesome" );
 
                             VBox player1 = new VBox();
-                            player1.getChildren().add(playerIcon);
+                            var iv = SceneUtils.getImageFromSvg(player.getPawn());
+                            iv.setPreserveRatio(true);
+                            iv.fitWidthProperty().set(svgSize);
+                            iv.fitHeightProperty().set(svgSize);
+                            player1.getChildren().add(iv);
                             player1.getChildren().add(player1Label);
 
                             player1.setAlignment(Pos.CENTER);
@@ -825,18 +857,17 @@ public class BoardController extends MyController {
                             setPlayerAsCurrent(player);
                         }
                         case 1 -> {
-                            var playerIcon = GlyphsDude.createIcon(FontAwesomeIcons.USER);
-
                             Label player2Label = new Label();
                             player2Label.setText(player.getName());
                             player2Label.setWrapText(true);
                             player2Label.setStyle("-fx-text-fill: " + player.getColor() + ";");
 
-                            playerIcon.setStyle("-fx-fill: " + player.getColor() + ";");
-                            playerIcon.setStyle("-fx-font-family: FontAwesome" );
-
                             VBox player2 = new VBox();
-                            player2.getChildren().add(playerIcon);
+                            var iv = SceneUtils.getImageFromSvg(player.getPawn());
+                            iv.setPreserveRatio(true);
+                            iv.fitWidthProperty().set(svgSize);
+                            iv.fitHeightProperty().set(svgSize);
+                            player2.getChildren().add(iv);
                             player2.getChildren().add(player2Label);
 
                             player2.setAlignment(Pos.CENTER);
@@ -846,18 +877,17 @@ public class BoardController extends MyController {
                             player.setPlayerRow(1);
                         }
                         case 2 -> {
-                            var playerIcon = GlyphsDude.createIcon(FontAwesomeIcons.USER);
-
                             Label player3Label = new Label();
                             player3Label.setText(player.getName());
                             player3Label.setWrapText(true);
                             player3Label.setStyle("-fx-text-fill: " + player.getColor() + ";");
 
-                            playerIcon.setStyle("-fx-fill: " + player.getColor() + ";");
-                            playerIcon.setStyle("-fx-font-family: FontAwesome" );
-
                             VBox player3 = new VBox();
-                            player3.getChildren().add(playerIcon);
+                            var iv = SceneUtils.getImageFromSvg(player.getPawn());
+                            iv.setPreserveRatio(true);
+                            iv.fitWidthProperty().set(svgSize);
+                            iv.fitHeightProperty().set(svgSize);
+                            player3.getChildren().add(iv);
                             player3.getChildren().add(player3Label);
 
                             player3.setAlignment(Pos.CENTER);
@@ -878,7 +908,11 @@ public class BoardController extends MyController {
                             playerIcon.setStyle("-fx-font-family: FontAwesome" );
 
                             VBox player4 = new VBox();
-                            player4.getChildren().add(playerIcon);
+                            var iv = SceneUtils.getImageFromSvg(player.getPawn());
+                            iv.setPreserveRatio(true);
+                            iv.fitWidthProperty().set(svgSize);
+                            iv.fitHeightProperty().set(svgSize);
+                            player4.getChildren().add(iv);
                             player4.getChildren().add(player4Label);
 
                             player4.setAlignment(Pos.CENTER);
@@ -936,13 +970,15 @@ public class BoardController extends MyController {
 
             for (int tilePanelFormatter = 0; tilePanelFormatter < 3; tilePanelFormatter++) {
                 RowConstraints rc = new RowConstraints();
-                rc.setVgrow(Priority.SOMETIMES);
+                rc.setVgrow(Priority.NEVER);
                 rc.setValignment(VPos.CENTER);
+                rc.setPercentHeight(100);
                 copyTileGridPane.getRowConstraints().add(rc);
 
                 ColumnConstraints cc = new ColumnConstraints();
-                cc.setHgrow(Priority.SOMETIMES);
+                cc.setHgrow(Priority.NEVER);
                 cc.setHalignment(HPos.CENTER);
+                cc.setPercentWidth(100);
                 copyTileGridPane.getColumnConstraints().add(cc);
             }
 
@@ -1056,7 +1092,7 @@ public class BoardController extends MyController {
      * @param numberOfPlayers number of players that want to play. Minimum 2, maximum 4.
      * @return ArrayList of Players.
      */
-    private ArrayList<Player> setPlayersOnATile(int numberOfPlayers) {
+    private ArrayList<Player> setPlayersOnATile(int numberOfPlayers) throws BoardException {
         if(getIsOverNetworkSetting() && getIsCurrentPlayerHostSetting()){
             return new ArrayList<>(getCurrentGamePlayersSetting());
         }
@@ -1064,30 +1100,30 @@ public class BoardController extends MyController {
             if (numberOfPlayers == 2) {
                 return new ArrayList<>() {
                     {
-                        add(new Player(0, "P 1", "blue"));
-                        add(new Player(1, "P 2", "red"));
+                        add(new Player(0, "P 1", "blue", SvgEnum.PAWN_BLUE));
+                        add(new Player(1, "P 2", "red", SvgEnum.PAWN_RED));
                     }
                 };
 
             } else if (numberOfPlayers == 3) {
                 return new ArrayList<>() {
                     {
-                        add(new Player(0, "P 1", "blue"));
-                        add(new Player(1, "P 2", "red"));
-                        add(new Player(2, "P 3", "green"));
+                        add(new Player(0, "P 1", "blue", SvgEnum.PAWN_BLUE));
+                        add(new Player(1, "P 2", "red", SvgEnum.PAWN_RED));
+                        add(new Player(2, "P 3", "green", SvgEnum.PAWN_GREEN));
                     }
                 };
             } else if (numberOfPlayers == 4) {
                 return new ArrayList<>() {
                     {
-                        add(new Player(0, "P 1", "blue"));
-                        add(new Player(1, "P 2", "red"));
-                        add(new Player(2, "P 3", "green"));
-                        add(new Player(3, "P 4", "#b7b219"));
+                        add(new Player(0, "P 1", "blue", SvgEnum.PAWN_BLUE));
+                        add(new Player(1, "P 2", "red", SvgEnum.PAWN_RED));
+                        add(new Player(2, "P 3", "green", SvgEnum.PAWN_GREEN));
+                        add(new Player(3, "P 4", "#b7b219", SvgEnum.PAWN_YELLOW));
                     }
                 };
             } else {
-                throw new RuntimeException("Invalid number of players");
+                throw new BoardException("Invalid number of players");
             }
         }
 
@@ -1095,7 +1131,6 @@ public class BoardController extends MyController {
 
     private List<Player> getCurrentGamePlayersSetting() {
         Type listType = new TypeToken<List<Player>>() {}.getType();
-        LogUtils.logInfo(settings.get(SettingsEnum.PLAYERS).toString());
         return new Gson().fromJson(settings.get(SettingsEnum.PLAYERS).toString(),listType);
     }
 
@@ -1255,7 +1290,8 @@ public class BoardController extends MyController {
      * Takes input from text field and pushes it to chat message array
      */
     private void sendMessage() throws IOException {
-        addToChat(me.getName() + ": \n" + tfChatInput.getText(), true);
+        Player p = me != null ? me : currentPlayer;
+        addToChat(p.getName() + ": \n" + tfChatInput.getText(), true);
     }
 
     /**
@@ -1449,13 +1485,13 @@ public class BoardController extends MyController {
 
         return addBorder(pane,
                 topBorderColor,
-                topBorderColor != null ? BorderStrokeStyle.SOLID : BorderStrokeStyle.NONE,
+                topBorderColor != null ? BorderStrokeStyle.SOLID : BorderStrokeStyle.DASHED,
                 bottomBorderColor,
-                bottomBorderColor != null ? BorderStrokeStyle.SOLID : BorderStrokeStyle.NONE,
+                bottomBorderColor != null ? BorderStrokeStyle.SOLID : BorderStrokeStyle.DASHED,
                 rightBorderColor,
-                rightBorderColor != null ? BorderStrokeStyle.SOLID : BorderStrokeStyle.NONE,
+                rightBorderColor != null ? BorderStrokeStyle.SOLID : BorderStrokeStyle.DASHED,
                 leftBorderColor,
-                leftBorderColor != null ? BorderStrokeStyle.SOLID : BorderStrokeStyle.NONE,
+                leftBorderColor != null ? BorderStrokeStyle.SOLID : BorderStrokeStyle.DASHED,
                 borderRadius);
     }
 
@@ -1502,6 +1538,10 @@ public class BoardController extends MyController {
 
     }
 
+    private void disableControls() {
+        btnRoll.setDisable(true);
+    }
+
     private void abortGame() throws IOException {
         settings.remove(SettingsEnum.CURRENT_GAME_PLAYER);
         settings.remove(SettingsEnum.NUMBER_OF_TILES);
@@ -1512,11 +1552,16 @@ public class BoardController extends MyController {
         settings.remove(SettingsEnum.NUMBER_OF_PLAYERS);
         settings.remove(SettingsEnum.NUMBER_OF_SNAKES);
         settings.remove(SettingsEnum.PLAYERS);
-        readThread.interrupt();
-        NetworkUtils.disconnectFromServer();
-        if(getIsCurrentPlayerHostSetting()){
-            GameServer.stop();
+        if(readThread != null){
+            readThread.interrupt();
         }
+        if(NetworkUtils.getSocket() != null){
+            NetworkUtils.disconnectFromServer();
+            if(getIsCurrentPlayerHostSetting()){
+                GameServer.stop();
+            }
+        }
+
         goToNextStage(ViewEnum.MAIN_MENU_VIEW, "Game options");
     }
 
