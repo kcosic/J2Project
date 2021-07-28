@@ -1,6 +1,6 @@
 package main.hr.kcosic.project.controllers;
 
-import com.google.gson.GsonBuilder;
+import javafx.scene.paint.Color;
 import main.hr.kcosic.project.models.DataWrapper;
 import main.hr.kcosic.project.models.Player;
 import main.hr.kcosic.project.models.enums.DataType;
@@ -8,7 +8,6 @@ import main.hr.kcosic.project.models.enums.SettingsEnum;
 import main.hr.kcosic.project.models.enums.ViewEnum;
 import main.hr.kcosic.project.utils.LogUtils;
 import main.hr.kcosic.project.utils.NetworkUtils;
-import main.hr.kcosic.project.utils.SceneUtils;
 import main.hr.kcosic.project.utils.SerializationUtils;
 import javafx.application.Platform;
 import javafx.beans.property.ListProperty;
@@ -16,7 +15,6 @@ import javafx.beans.property.SimpleListProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
-import javafx.fxml.Initializable;
 import javafx.scene.control.*;
 import javafx.scene.layout.StackPane;
 import javafx.util.converter.IntegerStringConverter;
@@ -58,6 +56,8 @@ public class HostController extends MyController {
     public Slider slSnakes;
     @FXML
     public TextField tfLadders;
+    @FXML
+    public ColorPicker cpPlayerColor;
 
 
     protected ListProperty<String> listProperty = new SimpleListProperty<>();
@@ -83,6 +83,9 @@ public class HostController extends MyController {
                         if (data.getType() == DataType.PLAYER) {
                             Platform.runLater(()-> addPlayerToList((Player) data.getData()));
                         }
+                        else if (data.getType() == DataType.DISCONNECT){
+                            Platform.runLater(()-> removePlayerFromList((String) data.getData()));
+                        }
                     }
 
 
@@ -101,6 +104,11 @@ public class HostController extends MyController {
             }
         });
 
+    }
+
+    private void removePlayerFromList(String playerName) {
+        players.removeIf(player -> player.getName().equals(playerName));
+        listProperty.removeIf(name -> name.equals(playerName));
     }
 
 
@@ -173,11 +181,13 @@ public class HostController extends MyController {
         runServer();
         receiveThread.start();
 
-        var me = new Player(0,tfName.getText(), "#ffffff");
+        var me = new Player(0,tfName.getText(), toHexString(cpPlayerColor.getValue()));
         var data = new DataWrapper(DataType.PLAYER, me );
         NetworkUtils.sendData(data);
+        settings.put(SettingsEnum.CURRENT_GAME_PLAYER, SerializationUtils.serialize(me));
+
+        cpPlayerColor.setDisable(true);
         tfName.setDisable(true);
-        btnStart.setDisable(false);
     }
     @FXML
     public void start() throws IOException {
@@ -197,7 +207,19 @@ public class HostController extends MyController {
     public void back() throws IOException {
         GameServer.stop();
         receiveThread.interrupt();
-        goToNextStage(ViewEnum.NETWORK_GAME_OPTIONS, "Network game");
+        settings.remove(SettingsEnum.CURRENT_GAME_PLAYER);
+        goToNextStage(ViewEnum.NETWORK_VIEW, "Network game");
+    }
+
+
+    private String format(double val) {
+        String in = Integer.toHexString((int) Math.round(val * 255));
+        return in.length() == 1 ? "0" + in : in;
+    }
+
+    private String toHexString(Color value) {
+        return "#" + (format(value.getRed()) + format(value.getGreen()) + format(value.getBlue()) + format(value.getOpacity()))
+                .toUpperCase();
     }
 }
 

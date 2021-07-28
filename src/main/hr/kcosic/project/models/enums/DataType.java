@@ -8,4 +8,6 @@ public enum DataType implements Serializable {
     PLAYER,
     START_GAME,
     GAME_STATE,
+    END_GAME,
+    DISCONNECT,
 }

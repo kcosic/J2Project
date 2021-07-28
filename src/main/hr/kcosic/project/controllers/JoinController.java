@@ -1,6 +1,8 @@
 package main.hr.kcosic.project.controllers;
 
+import javafx.scene.control.ColorPicker;
 import javafx.scene.control.Label;
+import javafx.scene.paint.Color;
 import main.hr.kcosic.project.models.DataWrapper;
 import main.hr.kcosic.project.models.Player;
 import main.hr.kcosic.project.models.enums.DataType;
@@ -9,7 +11,6 @@ import main.hr.kcosic.project.models.enums.ViewEnum;
 import main.hr.kcosic.project.utils.*;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
-import javafx.fxml.Initializable;
 import javafx.scene.control.Button;
 import javafx.scene.control.TextField;
 
@@ -29,6 +30,8 @@ public class JoinController extends MyController {
     public TextField tfAddress;
     @FXML
     public Label lblStatus;
+    @FXML
+    public ColorPicker cpColor;
 
     private Thread newThread;
 
@@ -45,7 +48,12 @@ public class JoinController extends MyController {
 
     @FXML
     public void back() throws IOException {
-        goToNextStage(ViewEnum.NETWORK_GAME_OPTIONS, "Network game");
+        if(newThread != null){
+            newThread.interrupt();
+            NetworkUtils.sendData(new DataWrapper(DataType.DISCONNECT, tfName.getText()));
+            NetworkUtils.disconnectFromServer();
+        }
+        goToNextStage(ViewEnum.NETWORK_VIEW, "Network game");
     }
 
     /**
@@ -65,10 +73,11 @@ public class JoinController extends MyController {
         }
 
         if(hasConnection){
-            lblStatus.setText("Connected, waiting for host to start the game.");
-            var player = new DataWrapper(DataType.PLAYER, new Player(0, tfName.getText(), "#ffffff" ));
+            lblStatus.setText("Connected, waiting for host to start the game." );
+            var player = new DataWrapper(DataType.PLAYER, new Player(0, tfName.getText(), toHexString(cpColor.getValue())));
             NetworkUtils.sendData(player);
             btnConnect.setDisable(true);
+            cpColor.setDisable(true);
             tfName.setDisable(true);
             tfAddress.setDisable(true);
 
@@ -96,7 +105,12 @@ public class JoinController extends MyController {
                             }
                         }
 
-                    } catch (IOException | ClassNotFoundException e) {
+                    }
+                    catch (SocketException e){
+                        LogUtils.logInfo("Disconnected from the server.");
+                        exit = true;
+                    }
+                    catch (IOException | ClassNotFoundException e) {
                         throw new RuntimeException(e);
                     }
 
@@ -114,5 +128,18 @@ public class JoinController extends MyController {
     @FXML
     public void checkValidity() {
         btnConnect.setDisable(tfAddress.getText().trim().isEmpty() || tfName.getText().trim().isEmpty());
+    }
+
+    public void onSelectedColor() {
+    }
+
+    private String format(double val) {
+        String in = Integer.toHexString((int) Math.round(val * 255));
+        return in.length() == 1 ? "0" + in : in;
+    }
+
+    private String toHexString(Color value) {
+        return "#" + (format(value.getRed()) + format(value.getGreen()) + format(value.getBlue()) + format(value.getOpacity()))
+                .toUpperCase();
     }
 }

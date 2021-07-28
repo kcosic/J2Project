@@ -8,10 +8,10 @@ public enum ViewEnum {
     NEW_GAME_VIEW("NewGameView"),
     BOARD_VIEW("BoardView"),
     OPTIONS_VIEW("OptionsView"),
-    HOTSEAT_GAME_OPTIONS("HotSeatGameOptions"),
+    HOTSEAT_VIEW("HotSeatView"),
     HOST_VIEW("HostView"),
     JOIN_VIEW("JoinView"),
-    NETWORK_GAME_OPTIONS("NetworkGameOptions");
+    NETWORK_VIEW("NetworkView");
 
     private final String text;
 
@@ -22,5 +22,9 @@ public enum ViewEnum {
     @Override
     public String toString() {
         return text;
+    }
+
+    public String getResourcePath(){
+        return "/views/" + text + ".fxml";
     }
 }

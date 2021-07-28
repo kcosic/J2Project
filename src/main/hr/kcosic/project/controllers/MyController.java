@@ -31,6 +31,6 @@ public abstract class MyController implements Initializable {
 
     public void goToNextStage(ViewEnum view, String stageTitle) throws IOException {
         saveSettings(settings);
-        SceneUtils.createAndReplaceStage(view.toString(), stageTitle, settings);
+        SceneUtils.createAndReplaceStage(view.getResourcePath(), stageTitle, settings);
     }
 }

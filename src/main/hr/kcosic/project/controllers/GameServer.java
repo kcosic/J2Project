@@ -6,7 +6,9 @@ import main.hr.kcosic.project.models.enums.DataType;
 import main.hr.kcosic.project.utils.LogUtils;
 
 import java.io.*;
-import java.net.*;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.SocketException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -14,10 +16,6 @@ import java.util.List;
 public class GameServer {
     public static final int PORT_NUM = 5555;
 
-
-    public static ServerThread getServerThread() {
-        return serverThread;
-    }
 
     private static ServerThread serverThread = null;
 
@@ -45,6 +43,7 @@ public class GameServer {
          */
         private static int COUNT = 1;
 
+
         /**
          * Used for knowing if the game has started already
          */
@@ -64,24 +63,27 @@ public class GameServer {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-            while (true) {
+            var exit = false;
+            while (!exit) {
                 ClientHandler newClient;
                 try {
-                    LogUtils.logInfo("Server is listening");
-                    var newClientSocket = serverSocket.accept();
-                    if(clients.size() <= 4 || hasGameStarted){
-                        newClient = new ClientHandler(newClientSocket, isHost);
-                        if(isHost){
-                            isHost = false;
-                        }
-                        LogUtils.logInfo("Server got new client");
-                        clients.add(newClient);
+                    if(this.isInterrupted()){
+                        exit = true;
                     }
                     else {
-                        newClientSocket.close();
+                        LogUtils.logInfo("Server is listening");
+                        var newClientSocket = serverSocket.accept();
+                        if (clients.size() <= 4 || hasGameStarted) {
+                            newClient = new ClientHandler(newClientSocket, isHost);
+                            if (isHost) {
+                                isHost = false;
+                            }
+                            LogUtils.logInfo("Server got new client");
+                            clients.add(newClient);
+                        } else {
+                            newClientSocket.close();
+                        }
                     }
-
-
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -92,11 +94,10 @@ public class GameServer {
 
         /**
          * Triggers start of the game
-         * @param data Flag for players that the game has been started.
          */
-        public static void startGame(DataWrapper data){
+        public static void startGame(){
             for (var client : clients) {
-                client.sendToClient(data);
+                client.sendToClient(new DataWrapper(DataType.START_GAME, client.player));
             }
             hasGameStarted = true;
         }
@@ -129,16 +130,6 @@ public class GameServer {
         }
 
         /**
-         * Message is sent to all clients without regard of who sent it
-         * @param data Data that is being sent to clients
-         */
-        public static void broadcast(DataWrapper data){
-            for (var client : clients) {
-                client.sendToClient(data);
-            }
-        }
-
-        /**
          * Stops server thread, all client connections and closes server socket
          * @throws IOException Is thrown if there is an error while trying to stop client connection
          */
@@ -160,7 +151,6 @@ public class GameServer {
          */
         public final boolean isHost;
         private ObjectOutputStream out;
-        private ObjectInputStream in;
         private Thread readThread;
         private Thread writeThread;
         private Player player;
@@ -171,7 +161,7 @@ public class GameServer {
             this.clientSocket = socket;
             this.isHost = isHost;
             setDaemon(true);
-            this.start();
+            start();
 
         }
 
@@ -210,12 +200,23 @@ public class GameServer {
         private void SortData(DataWrapper data) {
             try{
                 switch (data.getType()){
-                    case MESSAGE, GAME_STATE, BOARD -> ServerThread.broadcast(data, this);
+                    case MESSAGE, GAME_STATE, BOARD, END_GAME -> ServerThread.broadcast(data, this);
                     case PLAYER -> dealWithPlayer((Player)data.getData());
-                    case START_GAME -> ServerThread.startGame(data);
+                    case START_GAME -> ServerThread.startGame();
+                    case DISCONNECT -> handleDisconnect(data);
                     default -> throw new InvalidClassException("Invalid class type. Has to be Player, String, Board or GameState");
                 }
             } catch (Exception e){
+                e.printStackTrace();
+            }
+        }
+
+        private void handleDisconnect(DataWrapper data) {
+            ServerThread.sendToHost(data);
+            ServerThread.clients.remove(this);
+            try {
+                stopConnection();
+            } catch (IOException e) {
                 e.printStackTrace();
             }
         }
@@ -237,20 +238,6 @@ public class GameServer {
             out.flush();
         }
 
-        private void sendToClient(Object data, DataType type){
-            writeThread = new Thread(() -> {
-                var dataWrapper = new DataWrapper(type, data);
-                try {
-                    sendData(dataWrapper);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-
-            });
-            writeThread.start();
-
-        }
-
         private void sendToClient(DataWrapper data){
             writeThread = new Thread(() -> {
                 try {
@@ -264,10 +251,15 @@ public class GameServer {
         }
 
         public void stopConnection() throws IOException {
-            in.close();
-            out.close();
-            readThread.interrupt();
-            writeThread.interrupt();
+            if(out != null){
+                out.close();
+            }
+            if(readThread != null){
+                readThread.interrupt();
+            }
+            if(writeThread != null){
+                writeThread.interrupt();
+            }
             clientSocket.close();
         }
 

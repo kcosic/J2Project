@@ -7,6 +7,7 @@ import de.jensd.fx.glyphs.fontawesome.FontAwesomeIcons;
 import main.hr.kcosic.project.models.*;
 import main.hr.kcosic.project.models.enums.DataType;
 import main.hr.kcosic.project.models.enums.SettingsEnum;
+import main.hr.kcosic.project.models.enums.SvgEnum;
 import main.hr.kcosic.project.models.enums.ViewEnum;
 import main.hr.kcosic.project.models.exceptions.BoardException;
 import main.hr.kcosic.project.models.exceptions.EndOfBoardException;
@@ -80,6 +81,7 @@ public class BoardController extends MyController {
 
     private List<Player> players = new ArrayList<>();
 
+    private Player me;
 
 
     @Override
@@ -133,6 +135,9 @@ public class BoardController extends MyController {
         });
 
         if(getIsOverNetworkSetting()){
+            me = SerializationUtils.deserialize(settings.get(SettingsEnum.CURRENT_GAME_PLAYER).toString(), new TypeToken<>() {
+            });
+
             clientSocket = NetworkUtils.getSocket();
             readThread = new Thread(()->{
                 var exit = false;
@@ -148,6 +153,14 @@ public class BoardController extends MyController {
                                 case MESSAGE -> Platform.runLater(()->crunchMessage((String)data.getData()));
                                 case GAME_STATE -> Platform.runLater(()->crunchNewGameState((GameState)data.getData()));
                                 case BOARD -> Platform.runLater(()-> copyBoard((Board)data.getData()));
+                                case END_GAME -> Platform.runLater(()-> {
+                                    MessageUtils.showMessage("Leaving game","", "Player " + data.getData().toString() + " has left the game. You will be returned to main menu", Alert.AlertType.INFORMATION);
+                                    try {
+                                        abortGame();
+                                    } catch (IOException e) {
+                                        e.printStackTrace();
+                                    }
+                                });
                                 default -> throw new InvalidObjectException("Wrong data");
                             }
                         }
@@ -162,6 +175,7 @@ public class BoardController extends MyController {
 
     private void copyBoard(Board data) {
         LogUtils.logWarning("Copying board");
+        btnRoll.setDisable(true);
         tiles = data.getTiles();
         generateBoardFromTiles(tiles);
         players = data.getPlayers();
@@ -186,6 +200,8 @@ public class BoardController extends MyController {
         lblDiceResult.setText(dice + "");
 
         state = new GameState();
+
+        btnRoll.setDisable(!me.equals(currentPlayer));
     }
 
     private void crunchMessage(String data) {
@@ -197,6 +213,11 @@ public class BoardController extends MyController {
     }
 
     private void initializeComponents() {
+        var iv = SceneUtils.getImageFromSvg(SvgEnum.DICE);
+        iv.setPreserveRatio(true);
+        iv.fitWidthProperty().bind(btnRoll.widthProperty());
+        iv.fitHeightProperty().bind(btnRoll.heightProperty());
+        btnRoll.setGraphic(iv);
         lvChatLog.itemsProperty().bind(listProperty);
         listProperty.set(chat);
         lvChatLog.setCellFactory(list -> new ListCell<>() {
@@ -231,7 +252,7 @@ public class BoardController extends MyController {
      * @param keyEvent keyboard event.
      */
     @FXML
-    public void sendMessage(KeyEvent keyEvent) {
+    public void sendMessage(KeyEvent keyEvent) throws IOException {
         if (isEnter(keyEvent)) {
             sendMessage();
             clearTextField();
@@ -374,15 +395,20 @@ public class BoardController extends MyController {
 
     @FXML
     public void rollDice() throws BoardException {
+
+        btnRoll.setDisable(true);
         dice = (((int) (Math.random() * 100)) % 6) + 1;
         lblDiceResult.setText(dice + "");
         state.setRolledDice(dice);
         try {
             movePlayerNTiles(currentPlayer);
         } catch (EndOfBoardException e) {
-            // if(!getIsHardGameSetting()){
-            finishGame(currentPlayer);
-            // }
+            if(!getIsHardGameSetting()){
+                finishGame(currentPlayer);
+            }
+            else{
+                //TODO hard ending logic
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -401,14 +427,7 @@ public class BoardController extends MyController {
     private void switchPlayers() {
 
         if (getIsOverNetworkSetting()) {
-            LogUtils.logSevere("CURRENT ->\n" + SerializationUtils.serialize(currentPlayer));
-
-            var currentPlayer = players.stream().filter((player)->{
-                if(player.getId() == this.currentPlayer.getId()){
-                    return true;
-                }
-                return false;
-            }).findFirst();
+            var currentPlayer = players.stream().filter((player)-> player.getId() == this.currentPlayer.getId()).findFirst();
 
             if(currentPlayer.isEmpty()){
                 throw new RuntimeException("Current player is not present!");
@@ -416,15 +435,13 @@ public class BoardController extends MyController {
 
             if(players.indexOf(currentPlayer.get()) + 1 >= players.size())
             {
-                LogUtils.logInfo("SETTING FIRST PLAYER IN ARRAY");
                 state.setCurrentPlayer(players.get(0));
             }
             else {
-                LogUtils.logInfo("SETTING NEXT PLAYER IN ARRAY -> \n" + SerializationUtils.serialize(players.get(players.indexOf(currentPlayer.get()))));
                 state.setCurrentPlayer(players.get(players.indexOf(currentPlayer.get()) + 1));
             }
             setPlayerAsCurrent(state.getCurrentPlayer());
-            LogUtils.logWarning("SENT STATE -> " + SerializationUtils.serialize(state));
+
             var send = new Thread(()->{
                 try {
                     NetworkUtils.sendData(new DataWrapper(DataType.GAME_STATE, state));
@@ -432,7 +449,6 @@ public class BoardController extends MyController {
                     e.printStackTrace();
                 }
             });
-            //TODO send new gamestate
             send.start();
         } else {
             int nextPlayerId = getNextPLayerId();
@@ -488,7 +504,6 @@ public class BoardController extends MyController {
      * @throws EndOfBoardException is thrown when player is trying to move out of bounds of the board.
      */
     private void movePlayerNTiles(Player player) throws BoardException, EndOfBoardException, IOException {
-        //TODO original player position is not removed, move player to another Tile object and remove him from currentPlayer variable
         state.setPreviousPlayer(player);
 
         Tile currentTile = null;
@@ -525,14 +540,14 @@ public class BoardController extends MyController {
 
         if (nextTile.getLadderStartId() != null) {
             for (Tile tile : tiles) {
-                if (Objects.equals(tile.getLadderEndId(), nextTile.getLadderStartId())) {
+                if (tile.getLadderEndId().equals(nextTile.getLadderStartId())) {
                     nextTile = tile;
                     break;
                 }
             }
         } else if (nextTile.getSnakeStartId() != null) {
             for (Tile tile : tiles) {
-                if (Objects.equals(tile.getSnakeStartId(), nextTile.getSnakeEndId())) {
+                if (tile.getSnakeStartId().equals(nextTile.getSnakeEndId())) {
                     nextTile = tile;
                     break;
                 }
@@ -1239,8 +1254,8 @@ public class BoardController extends MyController {
     /**
      * Takes input from text field and pushes it to chat message array
      */
-    private void sendMessage() {
-        chat.add(tfChatInput.getText());
+    private void sendMessage() throws IOException {
+        addToChat(me.getName() + ": \n" + tfChatInput.getText(), true);
     }
 
     /**
@@ -1474,13 +1489,35 @@ public class BoardController extends MyController {
 
           if(button.equals(ButtonType.OK)){
               try {
-                  goToNextStage(ViewEnum.HOTSEAT_GAME_OPTIONS, "Game options");
+                  if(getIsOverNetworkSetting()){
+                      var data = new DataWrapper(DataType.END_GAME, me.getName());
+                      NetworkUtils.sendData(data);
+                  }
+                  abortGame();
               } catch (IOException e) {
                   e.printStackTrace();
               }
           }
 
 
+    }
+
+    private void abortGame() throws IOException {
+        settings.remove(SettingsEnum.CURRENT_GAME_PLAYER);
+        settings.remove(SettingsEnum.NUMBER_OF_TILES);
+        settings.remove(SettingsEnum.IS_HARD_GAME);
+        settings.remove(SettingsEnum.IS_CURRENT_PLAYER_HOST);
+        settings.remove(SettingsEnum.IS_OVER_NETWORK);
+        settings.remove(SettingsEnum.NUMBER_OF_LADDERS);
+        settings.remove(SettingsEnum.NUMBER_OF_PLAYERS);
+        settings.remove(SettingsEnum.NUMBER_OF_SNAKES);
+        settings.remove(SettingsEnum.PLAYERS);
+        readThread.interrupt();
+        NetworkUtils.disconnectFromServer();
+        if(getIsCurrentPlayerHostSetting()){
+            GameServer.stop();
+        }
+        goToNextStage(ViewEnum.MAIN_MENU_VIEW, "Game options");
     }
 
 

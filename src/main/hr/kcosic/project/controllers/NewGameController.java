@@ -1,11 +1,9 @@
 package main.hr.kcosic.project.controllers;
 
 import javafx.fxml.FXML;
-import javafx.fxml.Initializable;
 import javafx.scene.control.Button;
 import main.hr.kcosic.project.models.enums.SettingsEnum;
 import main.hr.kcosic.project.models.enums.ViewEnum;
-import main.hr.kcosic.project.utils.SceneUtils;
 
 import java.io.IOException;
 import java.net.URL;
@@ -27,13 +25,13 @@ public class NewGameController extends MyController {
     @FXML
     public void newHotSeatGame() throws IOException {
         settings.put(SettingsEnum.IS_OVER_NETWORK, String.valueOf(false));
-        goToNextStage(ViewEnum.HOTSEAT_GAME_OPTIONS, "Setup");
+        goToNextStage(ViewEnum.HOTSEAT_VIEW, "Setup");
     }
 
     @FXML
     public void newNetworkGame() throws IOException {
         settings.put(SettingsEnum.IS_OVER_NETWORK, String.valueOf(true));
-        goToNextStage(ViewEnum.NETWORK_GAME_OPTIONS, "Network game");
+        goToNextStage(ViewEnum.NETWORK_VIEW, "Network game");
     }
 
     @FXML

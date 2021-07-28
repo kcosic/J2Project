@@ -11,7 +11,7 @@ public class Main extends Application {
     @Override
     public void start(Stage primaryStage){
         try {
-            SceneUtils.createStage(ViewEnum.MAIN_MENU_VIEW.toString(), "Main menu", FileUtils.loadSettings()).show();
+            SceneUtils.createStage(ViewEnum.MAIN_MENU_VIEW.getResourcePath(), "Main menu", FileUtils.loadSettings()).show();
         } catch (Exception e){
             e.printStackTrace();
         }
