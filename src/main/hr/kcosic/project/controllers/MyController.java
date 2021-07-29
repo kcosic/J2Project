@@ -1,6 +1,7 @@
 package main.hr.kcosic.project.controllers;
 
 import javafx.fxml.Initializable;
+import main.hr.kcosic.project.models.XmlProperties;
 import main.hr.kcosic.project.models.enums.ViewEnum;
 import main.hr.kcosic.project.utils.FileUtils;
 import main.hr.kcosic.project.utils.LogUtils;
@@ -12,7 +13,7 @@ import java.net.Socket;
 import java.util.Properties;
 
 public abstract class MyController implements Initializable {
-    public Properties settings;
+    public XmlProperties settings;
     public Socket clientSocket = null;
 
     public MyController() {
@@ -25,7 +26,7 @@ public abstract class MyController implements Initializable {
         this.clientSocket = clientSocket;
     }
 
-    public void saveSettings(Properties settings){
+    public void saveSettings(XmlProperties settings){
         FileUtils.saveSettings(settings);
     }
 

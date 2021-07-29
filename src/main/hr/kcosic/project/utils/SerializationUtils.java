@@ -29,12 +29,12 @@ public class SerializationUtils {
         }
     }
 
-    public static String serialize(Object object){
+    public static String serializeToJson(Object object){
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         return gson.toJson(object);
     }
 
-    public static <T> T deserialize(String json, TypeToken<T> type){
+    public static <T> T deserializeFromJson(String json, TypeToken<T> type){
         return new Gson().fromJson(json, type.getType());
     }
 

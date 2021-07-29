@@ -1,6 +1,5 @@
 package main.hr.kcosic.project.controllers;
 
-import javafx.scene.control.ColorPicker;
 import javafx.scene.control.Label;
 import javafx.scene.paint.Color;
 import main.hr.kcosic.project.models.DataWrapper;
@@ -30,8 +29,7 @@ public class JoinController extends MyController {
     public TextField tfAddress;
     @FXML
     public Label lblStatus;
-    @FXML
-    public ColorPicker cpColor;
+
 
     private Thread newThread;
 
@@ -77,7 +75,6 @@ public class JoinController extends MyController {
             var player = new DataWrapper(DataType.PLAYER, new Player(0, tfName.getText(), null, null));
             NetworkUtils.sendData(player);
             btnConnect.setDisable(true);
-            cpColor.setDisable(true);
             tfName.setDisable(true);
             tfAddress.setDisable(true);
 
@@ -92,7 +89,7 @@ public class JoinController extends MyController {
                         else {
                             var data = (DataWrapper)(new ObjectInputStream(NetworkUtils.getSocket().getInputStream())).readObject();
                             if(data.getType() == DataType.START_GAME){
-                                settings.put(SettingsEnum.CURRENT_GAME_PLAYER, SerializationUtils.serialize(data.getData()));
+                                settings.put(SettingsEnum.CURRENT_GAME_PLAYER, SerializationUtils.serializeToJson(data.getData()));
                                 exit = true;
                                 Platform.runLater(()->{
                                     try {

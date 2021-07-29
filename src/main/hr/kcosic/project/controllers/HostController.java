@@ -21,7 +21,6 @@ import javafx.util.converter.IntegerStringConverter;
 
 import java.io.EOFException;
 import java.io.IOException;
-import java.io.InterruptedIOException;
 import java.io.ObjectInputStream;
 import java.net.Socket;
 import java.net.URL;
@@ -56,8 +55,6 @@ public class HostController extends MyController {
     public Slider slSnakes;
     @FXML
     public TextField tfLadders;
-    @FXML
-    public ColorPicker cpPlayerColor;
 
 
     protected ListProperty<String> listProperty = new SimpleListProperty<>();
@@ -155,7 +152,7 @@ public class HostController extends MyController {
     }
 
     private void addPlayerToList(Player data) {
-        LogUtils.logInfo(SerializationUtils.serialize(data));
+        LogUtils.logInfo(SerializationUtils.serializeToJson(data));
         players.add(data);
         playerNames.add(data.getName());
         btnStart.setDisable(playerNames.size() < 2);
@@ -181,9 +178,8 @@ public class HostController extends MyController {
         var me = new Player(0,tfName.getText(), null, null);
         var data = new DataWrapper(DataType.PLAYER, me );
         NetworkUtils.sendData(data);
-        settings.put(SettingsEnum.CURRENT_GAME_PLAYER, SerializationUtils.serialize(me));
+        settings.put(SettingsEnum.CURRENT_GAME_PLAYER, SerializationUtils.serializeToJson(me));
 
-        cpPlayerColor.setDisable(true);
         tfName.setDisable(true);
     }
     @FXML
@@ -191,7 +187,7 @@ public class HostController extends MyController {
 
         var data = new DataWrapper(DataType.START_GAME, true );
         NetworkUtils.sendData(data);
-        settings.put(SettingsEnum.PLAYERS, SerializationUtils.serialize(players));
+        settings.put(SettingsEnum.PLAYERS, SerializationUtils.serializeToJson(players));
         settings.put(SettingsEnum.NUMBER_OF_PLAYERS, String.valueOf(players.size()));
         settings.put(SettingsEnum.NUMBER_OF_TILES, tfTiles.getText());
         settings.put(SettingsEnum.NUMBER_OF_SNAKES, tfSnakes.getText());

@@ -8,10 +8,10 @@ package main.hr.kcosic.project.utils;
 import java.io.*;
 import java.net.URI;
 import java.util.stream.Stream;
-import java.util.Properties;
 
 import javafx.stage.FileChooser;
 import javafx.stage.Window;
+import main.hr.kcosic.project.models.XmlProperties;
 import main.hr.kcosic.project.models.exceptions.SettingsException;
 
 import javax.swing.filechooser.FileSystemView;
@@ -19,7 +19,7 @@ import javax.swing.filechooser.FileSystemView;
 public class FileUtils {
     private static final String LOAD = "Load";
     private static final String SAVE = "Save";
-    private static Properties settings;
+    private static XmlProperties settings;
     private static URI uri;
 
     public static File uploadFileDialog(Window owner, String...extensions) {
@@ -46,18 +46,19 @@ public class FileUtils {
         return file;
     }
 
-    public static Properties loadSettings(){
+    public static XmlProperties loadSettings(){
 
         if(uri == null){
-            File file = new File("./settings.properties");
+            File file = new File("settings.properties");
             uri = file.toURI();
         }
 
         if(settings == null){
 
-            settings = new Properties();
+            settings = new XmlProperties();
             try (InputStream settingsIS = new FileInputStream(uri.getPath())) {
                 // load a properties file
+                //TODO LOAD FROM XML
                 settings.load(settingsIS);
                 if(settings.size() == 0){
                     throw new SettingsException("Settings are empty");
@@ -79,8 +80,8 @@ public class FileUtils {
         return settings;
     }
 
-    private static Properties createNewSettings() {
-        var settings = new Properties();
+    private static XmlProperties createNewSettings() {
+        var settings = new XmlProperties();
         settings.put("fullscreen","false");
         settings.put("resolution","1280x1024");
         return settings;
@@ -93,11 +94,11 @@ public class FileUtils {
         }
     }
 
-    public static void saveSettings(Properties settings){
+    public static void saveSettings(XmlProperties settings){
 
         try (OutputStream output = new FileOutputStream(uri.getPath())) {
             FileUtils.settings = settings;
-
+            //TODO save as XML
             settings.store(output, null);
         } catch (IOException io) {
             io.printStackTrace();

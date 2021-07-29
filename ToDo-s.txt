@@ -1,15 +1,5 @@
-dodati pozadine
+(pending) ReflectionAPI-> dokumentirati sve u HTML formatu
+(pending) JNDI i RMI-> povući inicijalnu konfiguraciju MP igre
 
-osposobiti socekt play
-
-fix oci
-
-fix board roll tipku
-
-fix rezolucija kada se ispocetka builda
-
-uvaciti neki fancy font
-
-stilizirati malo sve
-
+(done) xml-> extendati properties klasu
 

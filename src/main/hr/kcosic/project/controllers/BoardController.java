@@ -148,7 +148,7 @@ public class BoardController extends MyController {
         });
 
         if(getIsOverNetworkSetting()){
-            me = SerializationUtils.deserialize(settings.get(SettingsEnum.CURRENT_GAME_PLAYER).toString(), new TypeToken<>() {});
+            me = SerializationUtils.deserializeFromJson(settings.get(SettingsEnum.CURRENT_GAME_PLAYER).toString(), new TypeToken<>() {});
 
             clientSocket = NetworkUtils.getSocket();
             readThread = new Thread(()->{
