@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-
-<!ELEMENT root (settings)*>
-<!ELEMENT settings (entry)*>
-<!ELEMENT entry (key|value)*>
-<!ELEMENT key (#PCDATA)>
-<!ELEMENT value (#PCDATA)>

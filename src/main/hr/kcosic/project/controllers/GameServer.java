@@ -1,5 +1,7 @@
 package main.hr.kcosic.project.controllers;
 
+import javafx.scene.paint.Color;
+import main.hr.kcosic.project.models.ChatService;
 import main.hr.kcosic.project.models.DataWrapper;
 import main.hr.kcosic.project.models.Player;
 import main.hr.kcosic.project.models.enums.DataType;
@@ -10,14 +12,20 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.rmi.RemoteException;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
+import java.rmi.server.UnicastRemoteObject;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 
 public class GameServer {
     public static final int PORT_NUM = 5555;
 
-
+    private static ServerSocket serverSocket;
     private static ServerThread serverThread = null;
 
     public static void start(){
@@ -28,35 +36,43 @@ public class GameServer {
         LogUtils.logInfo("Started a new thread");
     }
 
-
     public static void stop() throws IOException {
         serverThread.stopServerThread();
     }
 
-    private static class ServerThread extends Thread{
+    private static class ServerThread extends Thread {
         /**
          * List of connected clients
          */
         private static final List<ClientHandler> clients = new ArrayList<>();
-
         /**
          * Counts how many connections server has so it knows in which order they came
          */
         private static int COUNT = 1;
-
-
         /**
          * Used for knowing if the game has started already
          */
         private static boolean hasGameStarted = false;
 
-        private static ServerSocket serverSocket;
+
+
+        private static final String CLIENT_NAME = "Client";
+        private static final String RMI_CLIENT = "client";
+        private static final String RMI_SERVER = "server";
+        private static final int REMOTE_PORT = 5001;
+        private static final int RANDOM_PORT_HINT = 0;
+
+
+        // we must keep a strong reference to service object, to avoid gc!
+        private static ChatService chatServer;
+        private static Registry registry;
+
 
         @Override
         public void run() {
             LogUtils.logInfo("Running server");
             var isHost = true;
-
+            publishChatServer();
             try {
                 serverSocket = new ServerSocket(PORT_NUM);//, 1, InetAddress.getByName("127.0.0.1"));
                 LogUtils.logInfo("Server socket is ready");
@@ -91,6 +107,25 @@ public class GameServer {
 
             }
 
+        }
+
+        private static void publishChatServer() {
+            chatServer = data -> clients.forEach(clientHandler -> {
+                LogUtils.logInfo("Sending message to all but sender->wanted client: " + data.getSenderId() + "| current client: " + clientHandler.getPlayerId());
+                if(clientHandler.getPlayerId() == data.getSenderId() ){
+                    LogUtils.logInfo("Sending message to all but sender");
+
+                    broadcast(data, clientHandler);
+                }
+            });
+            // publish server
+            try {
+                registry = LocateRegistry.createRegistry(REMOTE_PORT);
+                ChatService stub = (ChatService) UnicastRemoteObject.exportObject(chatServer, RANDOM_PORT_HINT);
+                registry.rebind(RMI_SERVER, stub);
+            } catch (RemoteException ex) {
+                Logger.getLogger(GameServer.class.getName()).log(Level.SEVERE, null, ex);
+            }
         }
 
         /**
@@ -157,13 +192,17 @@ public class GameServer {
         private Player player;
         private final Socket clientSocket;
 
-
+        public int getPlayerId(){
+            if(player == null){
+                return -1;
+            }
+            return player.getId();
+        }
         public ClientHandler(Socket socket, boolean isHost) {
             this.clientSocket = socket;
             this.isHost = isHost;
             setDaemon(true);
             start();
-
         }
 
         @Override
@@ -201,7 +240,8 @@ public class GameServer {
         private void SortData(DataWrapper data) {
             try{
                 switch (data.getType()){
-                    case MESSAGE, GAME_STATE, BOARD, END_GAME -> ServerThread.broadcast(data, this);
+                    case MESSAGE -> ServerThread.chatServer.send(data);
+                    case GAME_STATE, BOARD, END_GAME -> ServerThread.broadcast(data, this);
                     case PLAYER -> dealWithPlayer((Player)data.getData());
                     case START_GAME -> ServerThread.startGame();
                     case DISCONNECT -> handleDisconnect(data);

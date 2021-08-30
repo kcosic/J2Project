@@ -1,1 +1,0 @@
-packageSearchIndex = [{"l":"All Packages","u":"allpackages-index.html"},{"l":"main.hr.kcosic.project"},{"l":"main.hr.kcosic.project.controllers"},{"l":"main.hr.kcosic.project.models"},{"l":"main.hr.kcosic.project.models.enums"},{"l":"main.hr.kcosic.project.models.exceptions"},{"l":"main.hr.kcosic.project.utils"}];updateSearchResults();

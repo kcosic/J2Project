@@ -13,18 +13,18 @@ public enum ViewEnum {
     JOIN_VIEW("JoinView"),
     NETWORK_VIEW("NetworkView");
 
-    private final String text;
+    private final String viewName;
 
-    ViewEnum(String text){
-        this.text = text;
+    ViewEnum(String viewName){
+        this.viewName = viewName;
     }
 
     @Override
     public String toString() {
-        return text;
+        return viewName;
     }
 
     public String getResourcePath(){
-        return "/views/" + text + ".fxml";
+        return "/views/" + viewName + ".fxml";
     }
 }

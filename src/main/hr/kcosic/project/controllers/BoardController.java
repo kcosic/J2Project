@@ -42,8 +42,14 @@ import java.io.ObjectInputStream;
 import java.lang.reflect.Type;
 import java.net.Socket;
 import java.net.URL;
+import java.rmi.RemoteException;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
+import java.rmi.server.UnicastRemoteObject;
 import java.util.*;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class BoardController extends MyController {
 
@@ -85,12 +91,27 @@ public class BoardController extends MyController {
     private Player me;
 
 
+    private static final String SERVER_NAME = "Server";
+    private static final String RMI_CLIENT = "client";
+    private static final String RMI_SERVER = "server";
+    private static final int REMOTE_PORT = 5001;
+    private static final int RANDOM_PORT_HINT = 0;
+
+    private static final String RMI_URL = "rmi://localhost:5001";
+
+
+    // we must keep a strong reference to service object, to avoid gc!
+    private ChatService client;
+    private ChatService server;
+    private Registry registry;
+
     @Override
     public void initialize(URL url, ResourceBundle resourceBundle) {
         try {
             initializeComponents();
             initializeListeners();
             areSettingsEmpty();
+            publishClient();
             if(isHotSeatOrHost()){
                 createBoard();
                 addSnakesAndLadders();
@@ -102,6 +123,7 @@ public class BoardController extends MyController {
                                     tiles,
                                     players
                             )
+
                     ));
                 }
                 redraw();
@@ -122,6 +144,25 @@ public class BoardController extends MyController {
             } catch (IOException ioException) {
                 ioException.printStackTrace();
             }
+        }
+    }
+
+    public void publishClient() {
+        client = data ->
+        {
+            try {
+                NetworkUtils.sendData(data);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        };
+        try {
+            registry = LocateRegistry.getRegistry(REMOTE_PORT);
+            ChatService stub = (ChatService) UnicastRemoteObject.exportObject(client, RANDOM_PORT_HINT);
+            registry.rebind(RMI_CLIENT, stub);
+
+        } catch (RemoteException ex) {
+            LogUtils.logSevere(ex.getMessage());
         }
     }
 
@@ -641,7 +682,8 @@ public class BoardController extends MyController {
     private void addToChat(String text, boolean sendToOtherPlayers) throws IOException {
         chat.add(text);
         if(getIsOverNetworkSetting() && sendToOtherPlayers){
-            NetworkUtils.sendData(new DataWrapper(DataType.MESSAGE, text));
+            client.send(new DataWrapper(DataType.MESSAGE, text, me.getId()));
+            //NetworkUtils.sendData(new DataWrapper(DataType.MESSAGE, text, me.getId()));
         }
     }
 

@@ -16,8 +16,10 @@ import org.apache.batik.transcoder.TranscoderOutput;
 import org.apache.batik.transcoder.image.ImageTranscoder;
 
 import java.awt.image.BufferedImage;
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.Objects;
 import java.util.Properties;
 
@@ -38,9 +40,7 @@ public class SceneUtils {
             resolution = settings.get(SettingsEnum.RESOLUTION).toString();
         }
         var isFullscreen = Boolean.parseBoolean(settings.get(SettingsEnum.FULLSCREEN).toString());
-
-
-        Parent root = FXMLLoader.load(Objects.requireNonNull(SceneUtils.class.getResource(view)));
+        Parent root = FXMLLoader.load(SceneUtils.class.getResource(view));
         if(stage == null){
             stage = new Stage();
         }
@@ -88,7 +88,14 @@ public class SceneUtils {
                 Image img = SwingFXUtils.toFXImage(trans.getBufferedImage(), null);
                 return new ImageView(img);
             } catch (TranscoderException ex) {
+                BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
+                try {
+                    in.readLine();
+                } catch (IOException ioException) {
+                    ioException.printStackTrace();
+                }
                 throw new RuntimeException(ex);
+
             }
         }
         catch (IOException io) {

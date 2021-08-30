@@ -7,6 +7,7 @@ import java.io.Serializable;
 public class DataWrapper implements Serializable {
     private Object data;
     private DataType type;
+    private int senderId;
 
     public DataWrapper() {
     }
@@ -14,6 +15,12 @@ public class DataWrapper implements Serializable {
     public DataWrapper(DataType type, Object data) {
         this.type = type;
         this.data = data;
+    }
+
+    public DataWrapper(DataType type, Object data, int senderId) {
+        this.type = type;
+        this.data = data;
+        this.senderId = senderId;
     }
 
     public DataType getType() {
@@ -31,4 +38,13 @@ public class DataWrapper implements Serializable {
     public void setData(Object data) {
         this.data = data;
     }
+
+    public int getSenderId() {
+        return senderId;
+    }
+
+    public void setSenderId(int senderId) {
+        this.senderId = senderId;
+    }
+
 }

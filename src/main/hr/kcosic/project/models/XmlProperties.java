@@ -2,8 +2,11 @@ package main.hr.kcosic.project.models;
 
 
 import java.io.*;
+import java.net.MalformedURLException;
+import java.net.URISyntaxException;
 import java.util.Properties;
 
+import main.hr.kcosic.project.Main;
 import main.hr.kcosic.project.utils.LogUtils;
 import org.w3c.dom.*;
 import org.xml.sax.*;
@@ -35,10 +38,7 @@ public class XmlProperties extends Properties {
                 var entry = createElement(document, "entry");
                 entry.appendChild(createElement(document, "key", key.toString()));
                 entry.appendChild(createElement(document, "value", value.toString()));
-
                 settings.appendChild(entry);
-                //settings.appendChild(createElement(document, key.toString(), value.toString()));
-
             });
 
             saveDocument(document, out);
@@ -53,7 +53,14 @@ public class XmlProperties extends Properties {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         DocumentBuilder builder = factory.newDocumentBuilder();
         DOMImplementation domImplementation = builder.getDOMImplementation();
-        DocumentType documentType = domImplementation.createDocumentType("DOCTYPE", null, getClass().getResource("/settings.dtd").getPath());
+        DocumentType documentType = null;
+        try {
+            LogUtils.logInfo("TEST->"+ Main.class.getResource("/assets/settings.dtd").toURI().toURL());
+
+            documentType = domImplementation.createDocumentType("DOCTYPE", null, Main.class.getResource("/assets/settings.dtd").toURI().toURL().toString());
+        } catch (MalformedURLException | URISyntaxException e) {
+            e.printStackTrace();
+        }
         return domImplementation.createDocument(null, element, documentType);
     }
 
